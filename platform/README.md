@@ -1,34 +1,55 @@
-# Pubbblic Studio — First Product Build
+# Pubbblic Platform — Authenticated Organization Workspaces
 
-**Stage:** Interactive product preview, not a production-ready distribution service.
+Current build: 0.2.0 (infrastructure implementation; database activation pending).
 
-The first standalone application build is in the platform directory, separate from the public marketing site in site/. It demonstrates the planned workspace, release editor and publication workflow without enabling incomplete external actions.
+## Implemented source
 
-## Included
+- Next.js 16 with server/browser Supabase SSR clients, session refresh proxy, verified claims protection, email OTP and magic-link callback.
+- Protected /dashboard and /login routes. The original local-only demo moved to /preview.
+- Organizations with owner/admin/editor/viewer roles, atomic owner bootstrap, admin-driven invitations matched to verified sign-in emails, invitation acceptance and tenant switching.
+- Releases with Row Level Security (RLS), optimistic concurrency version checking, immutable revision snapshots, and archive instead of destructive delete.
+- Private release-assets storage with organization/release scoped object paths, authenticated policies, 10 MB limit and MIME restrictions.
+- No service-role key or publisher credentials in the browser; publisher submissions and payments remain disabled.
 
-- Responsive sidebar workspace with Overview, Releases, Studio, Publisher Network, Reports and Settings.
-- New release editor covering headline, summary, issuer, dateline, category, body, optional quote/attribution, boilerplate and media contact.
-- Real-time release preview, character/word counts and deterministic editorial completeness checks.
-- Manual Save to browser-local storage, edit, delete and JSON export.
-- An unmistakably fictional sample announcement.
-- Clear PRELAUNCH, NOT PUBLISHED and NOT CONNECTED states.
-- No mock DeepSeek generation, no false publisher availability and no fictional reporting figures.
-- Static noindex marketing metadata, robots.txt disallow rule and /api/health.
+## Runtime setup required
 
-## Local development
+This repo does not yet have access to an eligible **Pubbblic** Supabase project through the connected app. DO NOT reuse Qalori, TXKPRO or FigSuite Supabase databases.
 
-Requires Node 22+. Run npm install, then npm run dev and visit http://localhost:3000. Run npm run build and npm run check before merging. Vercel project root is platform.
+1. Connect the dedicated Pubbblic Supabase project to the Pubbblic Supabase app, or select an appropriate organization for creating a new project.
+2. Review and apply `supabase/migrations/20261108180000_organizations_releases_rls.sql` on that dedicated project only.
+3. In Vercel project `pubbblic-platform`, set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to that project's publishable values. Rebuild after setting the values; browser variables are bundled at build time.
+4. Supabase Auth: enable email authentication and confirmed emails. Configure Site URL to the authorized app origin and allowed redirect URL to `https://<authorized-app-origin>/auth/callback`. Never use wildcard production redirect URLs.
+5. Default email template may send a Magic Link; the app supports that callback. To enable *six-digit OTP code entry*, include `{{ .Token }}` in the email template, as documented by Supabase. Set up dedicated SMTP and Auth rate limits before customer launch.
+6. Run structural checks in `supabase/tests/verify_structure.sql`, Supabase security advisors and real two-user / two-organization RLS tests.
+7. Verify signup, valid code/link, expired code/link, sign out, session refresh, tenant switching, unauthorized org access, release create/edit/version conflict, invite acceptance, private asset upload/read isolation and attachment restrictions.
+8. Only after these gates pass should the customer-facing domain and production access be enabled.
 
-## Important security limitation
+## Organization authorization design
 
-This preview has **no authentication, database, secure server storage or real publishing**. Draft data remains in browser localStorage only after the user clicks Save. Browser cache clearing may delete it. Do not enter confidential or real customer releases in the preview. Keep it as a Vercel preview until identity, storage and security work is complete.
+- No direct organization/membership INSERT/UPDATE/DELETE from the browser. New organizations and invitation acceptance use narrowly authorized RPCs.
+- Only owner/admin can create invitations.
+- Owner/admin/editor can create and modify draft releases; viewer can read only.
+- RLS uses `auth.uid()` and membership rows, not user-editable metadata claims.
+- Release organization ID, creator ID, status and creation timestamp cannot be changed by client updates.
+- Each save must increment the version by exactly one and records a row in `press_release_versions`.
+- Revision objects are immutable to authenticated clients.
+- Storage bucket `release-assets` is private. Object paths use organization/release IDs, storage policy checks access, and reads are via short-lived signed URLs.
+- Disabling or suspending a user account and removing memberships requires a future admin governance workflow; no user-side role elevation UI exists.
 
-## Next release gates
+## Limitations not yet cleared
 
-1. Create or choose a dedicated Pubbblic Supabase project; implement verified email login, sessions, organization tenancy, role permissions and RLS (PUB-02).
-2. Replace browser drafts with server-side versioned releases, media storage and approval workflow (PUB-03 and PUB-04). Migrate opt-in demo drafts only with an explicit user action.
-3. Integrate DeepSeek generation for a distinct publisher-specific version, validate factual fidelity and publisher rules before release (PUB-06.10–12).
-4. Add approved publisher inventory and Pubbblic-owned account custody only, then official APIs / permitted Zyte Actions; no customer connections (PUB-05, PUB-07).
-5. Durable jobs, pricing/Stripe, audit evidence, publication verification and production authorization gates (PUB-06, PUB-08, PUB-09, PUB-12).
+- Database migration not applied to a Pubbblic project; no end-to-end user/tenant test executed.
+- No automated invitation email; invitee sees pending invitations when logging in using the exact verified email.
+- Storage checks file MIME/size via bucket policy, but a separate content-inspection pipeline is still recommended for uploaded files.
+- No audit dashboard, billing, DeepSeek rewrite, Zyte publisher submission or live publication.
+- No claim of production authentication readiness until SMTP, redirect URLs, anti-abuse protections, regression tests and production owner authorization are complete.
 
-**No customer publishing, production activation, billing or provider connection is implied by this preview build.**
+## Local
+
+```bash
+cd platform
+npm install
+npm run check
+npm run build
+npm run dev
+```
