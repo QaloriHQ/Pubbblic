@@ -1,2 +1,2 @@
-import { StudioApp } from "@/components/StudioApp";
-export default function Home() { return <StudioApp />; }
+import { redirect } from "next/navigation";
+export default function Home() { redirect("/dashboard"); }
