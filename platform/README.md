@@ -1,6 +1,6 @@
 # Pubbblic Platform — Authenticated Organization Workspaces
 
-Current build: 0.2.0 (infrastructure implementation; database activation pending).
+Current build: 0.2.0 (Supabase schema activated; preview authentication configuration in progress).
 
 ## Implemented source
 
@@ -11,18 +11,27 @@ Current build: 0.2.0 (infrastructure implementation; database activation pending
 - Private release-assets storage with organization/release scoped object paths, authenticated policies, 10 MB limit and MIME restrictions.
 - No service-role key or publisher credentials in the browser; publisher submissions and payments remain disabled.
 
-## Runtime setup required
+## Activation status (November 8, 2026)
 
-This repo does not yet have access to an eligible **Pubbblic** Supabase project through the connected app. DO NOT reuse Qalori, TXKPRO or FigSuite Supabase databases.
+- Dedicated Supabase project: `Pubbblic Project` (`bcfyohbhhqbuhfwwedvc`), active.
+- GitHub integration applied migration `20261108180000_organizations_releases_rls`. **Do not apply it again**.
+- All six public application tables have RLS enabled; nine public-table policies and two storage-object policies installed.
+- Private `release-assets` bucket with 10 MB limit and allowlisted MIME types installed.
+- Initial Supabase security advisor now reports no findings; pre-existing `public.rls_auto_enable()` execute grants restricted.
+- A rollback-only SQL test exercised two synthetic verified identities, organization creation, release versioning and cross-organization read/write restrictions; no test accounts or records were retained.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are configured for **Vercel preview**. Supabase's Vercel integration supplies them for production separately. Never put a service-role/secret key into `NEXT_PUBLIC_`.
+- Verified build: `https://pubbblic-platform-bn21jsl01-qaloris-projects.vercel.app` (Vercel preview; SSO-protected).
+- **Outstanding**: Auth Site URL and redirect allowlist, actual OTP/email delivery, two real signed-in users and media-isolation acceptance tests.
 
-1. Connect the dedicated Pubbblic Supabase project to the Pubbblic Supabase app, or select an appropriate organization for creating a new project.
-2. Review and apply `supabase/migrations/20261108180000_organizations_releases_rls.sql` on that dedicated project only.
-3. In Vercel project `pubbblic-platform`, set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to that project's publishable values. Rebuild after setting the values; browser variables are bundled at build time.
-4. Supabase Auth: enable email authentication and confirmed emails. Configure Site URL to the authorized app origin and allowed redirect URL to `https://<authorized-app-origin>/auth/callback`. Never use wildcard production redirect URLs.
-5. Default email template may send a Magic Link; the app supports that callback. To enable *six-digit OTP code entry*, include `{{ .Token }}` in the email template, as documented by Supabase. Set up dedicated SMTP and Auth rate limits before customer launch.
-6. Run structural checks in `supabase/tests/verify_structure.sql`, Supabase security advisors and real two-user / two-organization RLS tests.
-7. Verify signup, valid code/link, expired code/link, sign out, session refresh, tenant switching, unauthorized org access, release create/edit/version conflict, invite acceptance, private asset upload/read isolation and attachment restrictions.
-8. Only after these gates pass should the customer-facing domain and production access be enabled.
+## Auth setup / remaining release gates
+
+1. Supabase Dashboard → Authentication → URL Configuration: for the current test, set Site URL to `https://pubbblic-platform-bn21jsl01-qaloris-projects.vercel.app`, and add exactly `https://pubbblic-platform-bn21jsl01-qaloris-projects.vercel.app/auth/callback` as a redirect URL. Update these when switching to a stable authorized app domain. Do not use a wildcard for production.
+2. Supabase Dashboard → Authentication → Providers → Email: enable email auth, confirm emails, and set sensible OTP expiry and throttling. The login app uses `signInWithOtp`; by default Supabase sends a Magic Link unless you customize the Magic Link template to include `{{ .Token }}`. Verify the template on a real opted-in test email.
+3. Configure a verified custom SMTP provider and sender before opening signups broadly. Test delivery, throttling, expired tokens and sign-out.
+4. Test two independently authenticated users in distinct organizations: access and mutation restrictions, invitations, editor/viewer capabilities, version conflicts, and private media upload/read. The rollback-only SQL test is not a substitute for actual user acceptance testing.
+5. Keep `app.pubbblic.com` and the payment/publisher flows disabled until security, editorial and product-owner production gates pass.
+
+The platform GitHub and Supabase integration are now connected. If enabling automatic database deployment, protect `main` with migration validation and security checks before merging new schema changes.
 
 ## Organization authorization design
 
@@ -38,7 +47,7 @@ This repo does not yet have access to an eligible **Pubbblic** Supabase project 
 
 ## Limitations not yet cleared
 
-- Database migration not applied to a Pubbblic project; no end-to-end user/tenant test executed.
+- Database migration is applied and structural/transactional RLS checks passed, but real-user sign-in and end-to-end tenant/media tests still require completion.
 - No automated invitation email; invitee sees pending invitations when logging in using the exact verified email.
 - Storage checks file MIME/size via bucket policy, but a separate content-inspection pipeline is still recommended for uploaded files.
 - No audit dashboard, billing, DeepSeek rewrite, Zyte publisher submission or live publication.
