@@ -41,7 +41,7 @@ export function Footer() {
   return <footer className="footer">
     <div className="container">
       <div className="footer-main">
-        <div className="footer-intro"><Wordmark inverse/><p>Make your news count.</p><span>Thoughtful distribution. Clearer outcomes.</span><span className="footer-prelaunch">In development · Join our launch list</span></div>
+        <div className="footer-intro"><Wordmark inverse/><p>Make your news count.</p><span>Thoughtful distribution. Clearer outcomes.</span><span>a <a href="https://mahtco.com" target="_blank" rel="noopener noreferrer" style={{ color: "#cbd6ef", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px" }}>Mahtco</a> company</span><span className="footer-prelaunch">In development · Join our launch list</span></div>
         <div className="footer-links">{footerGroups.map(g => <div key={g.name}><h3>{g.name}</h3>{g.links.map(([label,href]) => <Link key={href} href={href}>{label}</Link>)}</div>)}</div>
       </div>
       <div className="footer-bottom"><span>© {new Date().getUTCFullYear()} Pubbblic. All rights reserved.</span><span>Planned services subject to publisher authorization and editorial acceptance.</span></div>
