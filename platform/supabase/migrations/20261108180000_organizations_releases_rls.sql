@@ -311,3 +311,7 @@ create policy pubbblic_release_assets_insert on storage.objects
 
 -- Prevent arbitrary updates by client to the revision log.
 revoke insert,update,delete on public.press_release_versions from anon,authenticated;
+
+-- Existing Supabase project event-trigger function must not be directly callable by clients.
+-- Revoking EXECUTE does not disable its registered DDL event-trigger behavior.
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
