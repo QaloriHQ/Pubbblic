@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminRequest,isStorageConfigured } from "@/lib/supabase-admin";
 import { renderEmail } from "@/lib/email";
+import { createHmac } from "node:crypto";
 export const runtime="nodejs";
 export const maxDuration=60;
 type Subscriber={id:string;email:string;email_step:number;subscribed:boolean};
 export async function GET(req:NextRequest) {
   const secret=process.env.CRON_SECRET;
   if(!secret || req.headers.get("authorization")!=="Bearer "+secret) return NextResponse.json({error:"Unauthorized"},{status:401});
-  if(!isStorageConfigured() || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM || !process.env.UNSUBSCRIBE_SIGNING_SECRET)
+  if(!isStorageConfigured() || !process.env.RESEND_API_KEY || !process.env.RESEND_FROM || !process.env.UNSUBSCRIBE_SIGNING_SECRET || !process.env.EMAIL_POSTAL_ADDRESS)
     return NextResponse.json({error:"Email provider or storage not configured"},{status:503});
   if(process.env.WAITLIST_LAUNCHED==="true")return NextResponse.json({status:"paused_for_launch"});
   let sent=0,failed=0;
@@ -21,7 +22,7 @@ export async function GET(req:NextRequest) {
           method:"POST",headers:{"Authorization":"Bearer "+process.env.RESEND_API_KEY,
           "Content-Type":"application/json","Idempotency-Key":"pubbblic-waitlist-"+person.id+"-"+person.email_step},
           body:JSON.stringify({from:process.env.RESEND_FROM,to:[person.email],subject,html,text,
-            headers:{"List-Unsubscribe":"<"+(process.env.NEXT_PUBLIC_SITE_URL || "https://pubbblic.com")+"/unsubscribe?id="+person.id+"&sig="+require("node:crypto").createHmac("sha256",process.env.UNSUBSCRIBE_SIGNING_SECRET).update(person.id).digest("hex")+">"}}),
+            headers:{"List-Unsubscribe":"<"+(process.env.NEXT_PUBLIC_SITE_URL || "https://pubbblic.com")+"/unsubscribe?id="+person.id+"&sig="+createHmac("sha256",process.env.UNSUBSCRIBE_SIGNING_SECRET).update(person.id).digest("hex")+">"}}),
           signal:AbortSignal.timeout(15000)
         });
         if(!res.ok) throw new Error("Email provider returned "+res.status);
