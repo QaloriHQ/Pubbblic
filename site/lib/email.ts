@@ -23,7 +23,8 @@ export function renderEmail(id: string, step: number) {
   const url=unsubLink(id);
   const address=process.env.EMAIL_POSTAL_ADDRESS;
   if(!address) throw new Error("Missing postal contact address for email compliance");
-  const safeAddress=address.replace(/[&<>"\x27]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","\x27":"&#39;"}[c]||c));
+  const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const safeAddress = address.replace(/[&<>"']/g, (character) => entities[character] || character);
   const guide=SITE_URL+(step===1?"/guides/how-to-write-a-press-release":step===2?"/features/ai-rewriting":"/how-it-works");
   const html='<div style="font-family:Arial,sans-serif;max-width:540px;margin:auto;color:#1b2440;padding:30px"><div style="font-size:28px;font-weight:bold;color:#204ce5">pubbblic.</div><h1 style="font-size:29px;letter-spacing:-1px;margin-top:36px">'+entry.title+'</h1><p style="font-size:16px;line-height:1.8;color:#4e5b71">'+entry.body+'</p><p style="margin:35px 0"><a style="background:#244de2;color:#fff;text-decoration:none;padding:14px 19px;border-radius:8px;display:inline-block" href="'+guide+'">Explore Pubbblic</a></p><p style="border-top:1px solid #e7eaf1;padding-top:25px;color:#838b9e;font-size:12px;line-height:1.8">You joined the Pubbblic launch waitlist and opted in to educational and product update emails. <a href="'+url+'">Unsubscribe</a> anytime.<br/>Pubbblic · prelaunch announcements · '+safeAddress+'</p></div>';
   const text=entry.title+"\n\n"+entry.body+"\n\nExplore: "+guide+"\n\nYou subscribed to Pubbblic launch updates. Unsubscribe: "+url+"\n"+address;
