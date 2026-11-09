@@ -56,20 +56,20 @@ function renderMessage(message: Message) {
     "If you weren't expecting this invitation, ignore this email.",
     "Pubbblic — a Mahtco company, https://pubbblic.com",
   ].join("\n\n");
-  const html = \`<!doctype html><html lang="en"><head><meta charset="UTF-8"></head>
+  const html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"></head>
   <body style="background:#f5f7fb;margin:0;padding:28px;font-family:Arial,Helvetica,sans-serif;color:#17233f">
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;margin:auto;background:#fff;border-radius:14px;border:1px solid #dfe6f2">
       <tr><td style="padding:34px">
         <div style="font-size:30px;font-weight:800;letter-spacing:-1.5px">pubbblic<span style="color:#2652de">.</span></div>
         <p style="font-size:11px;font-weight:700;letter-spacing:2px;color:#6580b7;margin:30px 0 12px">ORGANIZATION INVITATION</p>
         <h1 style="font-size:29px;line-height:1.25;margin:0 0 14px">You're invited to collaborate</h1>
-        <p style="font-size:15px;line-height:1.8;color:#576984">You've been invited to join <strong>\${org}</strong> on Pubbblic.</p>
+        <p style="font-size:15px;line-height:1.8;color:#576984">You've been invited to join <strong>${org}</strong> on Pubbblic.</p>
         <table role="presentation" width="100%" style="background:#f2f5fc;border-radius:9px;margin:20px 0;padding:16px">
-          <tr><td style="padding:6px;font-size:13px;color:#687995">Organization</td><td style="padding:6px;text-align:right;font-weight:bold;font-size:13px">\${org}</td></tr>
-          <tr><td style="padding:6px;font-size:13px;color:#687995">Your role</td><td style="padding:6px;text-align:right;font-weight:bold;font-size:13px">\${role}</td></tr>
-          <tr><td style="padding:6px;font-size:13px;color:#687995">Expires</td><td style="padding:6px;text-align:right;font-size:13px">\${expires}</td></tr>
+          <tr><td style="padding:6px;font-size:13px;color:#687995">Organization</td><td style="padding:6px;text-align:right;font-weight:bold;font-size:13px">${org}</td></tr>
+          <tr><td style="padding:6px;font-size:13px;color:#687995">Your role</td><td style="padding:6px;text-align:right;font-weight:bold;font-size:13px">${role}</td></tr>
+          <tr><td style="padding:6px;font-size:13px;color:#687995">Expires</td><td style="padding:6px;text-align:right;font-size:13px">${expires}</td></tr>
         </table>
-        <p style="margin:27px 0"><a href="\${href}" style="display:inline-block;padding:15px 24px;background:#2652de;color:#fff;font-size:14px;text-decoration:none;border-radius:8px;font-weight:bold">Review invitation &amp; join</a></p>
+        <p style="margin:27px 0"><a href="${href}" style="display:inline-block;padding:15px 24px;background:#2652de;color:#fff;font-size:14px;text-decoration:none;border-radius:8px;font-weight:bold">Review invitation &amp; join</a></p>
         <p style="font-size:13px;line-height:1.8;color:#687995">Existing members can sign in. New users can create an account using a verification code. Joining requires explicitly accepting this invitation.</p>
         <p style="font-size:12px;line-height:1.7;color:#8492a8">If you weren't expecting this invitation, you can safely ignore it. This invitation does not grant access until you accept.</p>
         <div style="border-top:1px solid #e7ecf4;padding-top:21px;margin-top:28px;font-size:11px;color:#8f9cb1">
@@ -77,7 +77,7 @@ function renderMessage(message: Message) {
         </div>
       </td></tr>
     </table>
-  </body></html>\`;
+  </body></html>`;
   return { html, text, subject };
 }
 type Delivery = { id: string | null; provider: "zoho" | "resend" };
@@ -101,9 +101,9 @@ async function sendEmail(message: Message, provider: "zoho" | "resend", attempt:
       headers: {
         "Authorization": "Bearer " + Deno.env.get("RESEND_API_KEY"),
         "Content-Type": "application/json",
-        "Idempotency-Key": \`pubbblic-invitation-\${invitationId}-\${attempt}\`,
+        "Idempotency-Key": `pubbblic-invitation-${invitationId}-${attempt}`,
       },
-      body: JSON.stringify({ from: \`Pubbblic <\${from}>\`, to: [message.to], subject, html, text }),
+      body: JSON.stringify({ from: `Pubbblic <${from}>`, to: [message.to], subject, html, text }),
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) throw new DeliveryError("resend_rejected_" + response.status);
