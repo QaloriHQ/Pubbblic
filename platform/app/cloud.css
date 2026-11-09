@@ -61,3 +61,274 @@
 @media(max-width:950px){.cloud-two-col{grid-template-columns:1fr}.cloud-top small{display:none}.cloud-editor-side{display:flex}}
 @media(max-width:770px){.auth-page{grid-template-columns:1fr}.auth-left{min-height:0;padding:28px}.auth-wrap{margin:38px 0}.auth-wrap h1{font-size:53px;margin:20px 0}.auth-features{display:none}.auth-wrap>p{font-size:14px}.auth-right{padding:50px 24px}.cloud-sidebar{transform:translateX(-100%);transition:transform .2s;width:270px;z-index:56}.cloud-sidebar.opened{transform:translateX(0)}.cloud-close,.cloud-hamburger{display:inline-flex;border:0;background:transparent;color:inherit}.cloud-close{color:#fff}.cloud-sidebar-head{display:flex;justify-content:space-between}.cloud-hamburger{font-size:22px}.cloud-backdrop{display:block;position:fixed;inset:0;background:#101a3688;border:0;z-index:55}.cloud-main{margin-left:0;width:100%}.cloud-top{padding:0 18px;min-height:69px}.cloud-content{padding:22px 17px 70px}.cloud-heading{align-items:flex-start;flex-direction:column}.cloud-stats{grid-template-columns:1fr 1fr}.cloud-stats>div:last-child{grid-column:1/-1}.cloud-fields-two{grid-template-columns:1fr;gap:0}.cloud-footer{padding:20px;flex-direction:column}.cloud-setup{padding:27px 22px}.cloud-release-item{gap:9px}}
 @media(max-width:500px){.cloud-stats{grid-template-columns:1fr}.cloud-stats>div:last-child{grid-column:auto}.cloud-panel{padding:22px}.cloud-heading h1,.cloud-setup h1{font-size:33px}.cloud-release-item{flex-wrap:wrap}.cloud-release-item>div{flex-basis:58%}.cloud-release-item>span{display:none}}
+
+
+/* Release Studio: full-width authoring and reader-size live draft preview. */
+.cloud-editor-layout{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  min-width:0;
+  gap:20px;
+  padding-bottom:102px; /* room to scroll past the floating checklist */
+}
+.cloud-editor-wide,
+.cloud-release-preview-wide,
+.cloud-assets-wide{
+  width:100%;
+  min-width:0;
+}
+.cloud-editor-wide{padding:34px 40px}
+.cloud-release-preview-wide{
+  padding:0;
+  overflow:hidden;
+  scroll-margin-top:100px;
+}
+.cloud-preview-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:24px 32px;
+  background:#f8faff;
+  border-bottom:1px solid #e4eaf6;
+}
+.cloud-preview-heading .cloud-tag{margin-bottom:8px}
+.cloud-preview-heading p{
+  font-size:12px;
+  color:#7c8ba1;
+  line-height:1.6;
+  margin:0;
+}
+.cloud-preview-state{
+  flex-shrink:0;
+  border:1px solid #d7e1f2;
+  border-radius:20px;
+  padding:9px 12px;
+  font-size:10px;
+  color:#526ea8;
+  letter-spacing:.6px;
+  font-weight:850;
+  background:#fff;
+}
+.cloud-preview-document{
+  width:100%;
+  padding:43px clamp(24px,5vw,70px) 56px;
+  overflow-wrap:anywhere;
+}
+.cloud-release-preview-wide .cloud-preview-document h2{
+  max-width:1100px;
+  margin:0 0 24px;
+  font-size:clamp(29px,3vw,43px);
+  line-height:1.18;
+  letter-spacing:-1.5px;
+  color:#202c47;
+}
+.cloud-release-preview-wide .cloud-preview-document .cloud-summary{
+  max-width:1040px;
+  font-size:clamp(16px,1.7vw,20px);
+  line-height:1.7;
+  font-weight:700;
+  color:#4b6190;
+  margin:0 0 34px;
+}
+.cloud-preview-dateline{
+  margin:0 0 23px;
+  font-size:12px;
+  font-weight:850;
+  letter-spacing:.5px;
+  color:#8192b2;
+  text-transform:uppercase;
+}
+.cloud-release-preview-wide .cloud-preview-document>p,
+.cloud-release-preview-wide .cloud-preview-section>p{
+  font-size:16px;
+  line-height:1.95;
+  max-width:1100px;
+  color:#5c6b83;
+  margin:0 0 23px;
+  white-space:pre-wrap;
+}
+.cloud-release-preview-wide .cloud-preview-document blockquote{
+  max-width:1050px;
+  margin:32px 0;
+  padding:19px 26px;
+  border-left:4px solid #6484da;
+  background:#f8faff;
+  color:#405985;
+  font-size:17px;
+  line-height:1.8;
+  font-style:italic;
+  border-radius:0 10px 10px 0;
+}
+.cloud-release-preview-wide .cloud-preview-document cite{
+  display:block;
+  margin-top:11px;
+  font-size:12px;
+}
+.cloud-preview-section{
+  max-width:1100px;
+  margin-top:30px;
+  border-top:1px solid #e8ecf4;
+  padding-top:24px;
+}
+.cloud-preview-section h3{
+  color:#263957;
+  font-size:16px;
+  margin:0 0 12px;
+  letter-spacing:-.2px;
+}
+.cloud-preview-footer{
+  padding:17px 32px;
+  color:#8b9bb1;
+  background:#fafbfe;
+  border-top:1px solid #e8ecf4;
+  font-size:11px;
+}
+
+/* Floating, collapsible editorial checklist.
+   Collapsed state always displays live progress without occluding the editor. */
+.cloud-checklist-dock{
+  position:fixed;
+  right:28px;
+  bottom:calc(22px + env(safe-area-inset-bottom, 0px));
+  width:min(358px,calc(100vw - 36px));
+  z-index:45;
+  border:1px solid #dce5f4;
+  border-radius:14px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 14px 48px rgba(18,32,70,.20),0 2px 8px rgba(18,32,70,.06);
+}
+.cloud-checklist-trigger{
+  display:flex;
+  width:100%;
+  align-items:center;
+  gap:12px;
+  border:0;
+  background:#fff;
+  padding:13px 15px 10px;
+  color:#263b5e;
+  cursor:pointer;
+  text-align:left;
+}
+.cloud-checklist-trigger:focus-visible{
+  outline:3px solid #8ca6ec;
+  outline-offset:-3px;
+}
+.cloud-checklist-trigger-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  height:36px;
+  width:36px;
+  border-radius:10px;
+  background:#eaf0ff;
+  color:#3562d5;
+}
+.cloud-checklist-trigger-label{min-width:0;flex:1}
+.cloud-checklist-trigger-label strong{
+  display:block;
+  font-size:12px;
+  line-height:1.4;
+  font-weight:850;
+}
+.cloud-checklist-trigger-label small{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  color:#8998ac;
+}
+.cloud-checklist-trigger-count{
+  flex-shrink:0;
+  font-size:12px;
+  font-weight:850;
+  color:#2c5acb;
+}
+.cloud-checklist-chevron{
+  color:#70819f;
+  flex-shrink:0;
+  transition:transform .18s;
+}
+.cloud-checklist-chevron.open{transform:rotate(180deg)}
+.cloud-checklist-mini-progress{
+  height:4px;
+  background:#e9eef9;
+  overflow:hidden;
+}
+.cloud-checklist-mini-progress span,
+.cloud-checklist-progress span{
+  display:block;
+  height:100%;
+  background:#3465db;
+  transition:width .2s ease;
+}
+.cloud-checklist-details{
+  max-height:min(55vh,470px);
+  overflow:auto;
+  padding:22px 23px 18px;
+  border-bottom:1px solid #e6eaf3;
+}
+.cloud-checklist-details[hidden]{display:none}
+.cloud-checklist-details-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:6px 12px;
+}
+.cloud-checklist-details-header .cloud-tag{margin:0}
+.cloud-checklist-details-header strong{
+  color:#2b57bd;
+  font-size:12px;
+}
+.cloud-checklist-progress{
+  margin:17px 0 12px;
+  height:7px;
+  border-radius:8px;
+  overflow:hidden;
+  background:#edf1f8;
+}
+.cloud-checklist-details ul{list-style:none;padding:0;margin:0}
+.cloud-checklist-details li{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  border-top:1px solid #edf0f5;
+  padding:11px 0;
+  color:#4b5f82;
+  font-size:12px;
+  font-weight:700;
+}
+.cloud-checklist-details li .ok{color:#268b62}
+.cloud-checklist-details li .pending{color:#c0c9d9}
+.cloud-checklist-details p{
+  margin:12px 0 0;
+  font-size:11px;
+  line-height:1.65;
+  color:#8995a8;
+}
+@media(max-width:770px){
+  .cloud-editor-wide{padding:24px 21px}
+  .cloud-preview-heading{padding:20px 22px;align-items:flex-start}
+  .cloud-preview-document{padding:28px 22px 32px}
+  .cloud-preview-footer{padding:16px 22px}
+  .cloud-release-preview-wide .cloud-preview-document>p,
+  .cloud-release-preview-wide .cloud-preview-section>p{font-size:15px;line-height:1.85}
+  .cloud-checklist-dock{right:16px;bottom:calc(14px + env(safe-area-inset-bottom, 0px))}
+  .cloud-editor-layout{padding-bottom:100px}
+}
+@media(max-width:480px){
+  .cloud-preview-heading{flex-direction:column;gap:12px}
+  .cloud-preview-state{font-size:9px}
+  .cloud-release-preview-wide .cloud-preview-document h2{font-size:29px}
+  .cloud-checklist-dock{left:14px;right:14px;width:auto;bottom:calc(11px + env(safe-area-inset-bottom, 0px))}
+  .cloud-checklist-details{max-height:50vh}
+  .cloud-checklist-trigger{padding:10px 12px 8px}
+}
+@media(prefers-reduced-motion:reduce){
+  .cloud-checklist-chevron,
+  .cloud-checklist-progress span,
+  .cloud-checklist-mini-progress span{transition:none}
+}
