@@ -1,35 +1,60 @@
-# Pubbblic invitation acceptance — QA setup
+# Pubbblic organization invitations — implementation and activation
 
-## Implementation
+## Architecture
 
-The protected Supabase function notify-organization-invitation sends an authentication OTP to the invited email. The recipient invitation link is /invite/{invitation-id}. It allows the invitee to authenticate using an eight-digit OTP, verify their own pending invitation, and explicitly accept. The invitation's Viewer/Editor/Admin role is assigned only by the server-side acceptance RPC after the verified email matches. Owners/admins may copy a join link from Team & Invitations; no invitation details or access are exposed to unverified visitors.
+- Pubbblic persists organization invitation records with the assigned role, expiry, and verified-email match. Existing and newly registered users share one acceptance workflow.
+- A verified owner/admin invokes the `notify-organization-invitation` Supabase Edge Function to send one **branded, organization-specific transactional email**.
+- The sender uses a dedicated **Zoho Mail API (recommended for existing Pubbblic mailbox)** or **Resend** provider, never the Supabase Auth OTP template. It renders organization name, invited role, expiry date and a Join workspace URL.
+- Recipients open `/invite/<id>`, verify their email via Supabase Auth (eight-digit OTP when needed), view the matching invitation, and explicitly accept it. Email delivery never adds membership.
+- Role and organization verification is done through RLS-protected invitation reads and `accept_organization_invitation` RPC, not browser metadata or URL claims. Wrong account cannot accept.
+- Access emails do not automatically create Auth accounts, unlike the previous `signInWithOtp` dispatcher.
+- Sending is secured with explicit membership authorization, atomic attempt reservation, a 2-minute cooldown, a five-accepted-email limit, and a ten-attempt cap. Failures preserve invitation records.
+- The preview is Vercel-protected; invited external users may need Vercel team access. To invite external testers without that barrier, deploy to an approved public staging domain after access-control acceptance.
 
-## Add invitation link to existing Supabase templates
+## Activate transactional email (Supabase Edge Function secrets)
 
-In Supabase Authentication → Emails → Templates, add this CTA to both Magic link or OTP and Confirm sign up, after the {{ .Token }} code:
+Because Zoho SMTP credentials stored in Supabase Auth are not available to Edge Functions, **separate API credentials are required**. Configure **one** provider:
 
-```html
-<p>Continue to Pubbblic:</p>
-<p><a href="{{ .RedirectTo }}" style="display:inline-block;padding:12px 20px;background:#2652de;color:#fff;text-decoration:none;border-radius:8px;">Open Pubbblic</a></p>
-<p>Enter your verification code in Pubbblic, then accept the organization invitation.</p>
+### Zoho Mail API (recommended; same mailbox/domain as Pubbblic Auth)
+
+Set these as secrets for the Pubbblic Supabase project, not in the browser or GitHub:
+```env
+INVITATION_EMAIL_PROVIDER=zoho
+INVITATION_FROM_EMAIL=hello@pubbblic.com
+PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app
+ZOHO_MAIL_ACCOUNT_ID=<Zoho Mail account ID for hello@pubbblic.com>
+ZOHO_OAUTH_CLIENT_ID=<client-id>
+ZOHO_OAUTH_CLIENT_SECRET=<client-secret>
+ZOHO_OAUTH_REFRESH_TOKEN=<refresh-token-with-ZohoMail.messages.CREATE>
+```
+Set `ZOHO_ACCOUNTS_BASE_URL` and `ZOHO_MAIL_BASE_URL` only if the mailbox is in a non-US Zoho datacenter. Mail API OAuth refresh tokens are **different** from SMTP app passwords.
+Resources:
+- https://www.zoho.com/mail/help/api/getting-started-with-api.html
+- https://www.zoho.com/mail/help/api/post-send-an-email.html
+- https://www.zoho.com/developer/oauth/web-server-apps/refresh-access-token.html
+
+### Resend alternative
+
+```env
+INVITATION_EMAIL_PROVIDER=resend
+INVITATION_FROM_EMAIL=hello@pubbblic.com
+PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app
+RESEND_API_KEY=<verified-sender-domain-Resend-key>
 ```
 
-The CTA uses RedirectTo rather than ConfirmationURL so it opens the app without consuming any verification token. Because these templates also serve ordinary sign-in, retain generic wording rather than naming any particular organization. The Edge Function supplies an invitation-specific emailRedirectTo when sending an invitation email.
+Verify `pubbblic.com` in the provider and configure SPF/DKIM/DMARC before opening public signups. Do not send from an unverified address. Never configure both providers at the same time.
+Set `PUBBBLIC_APP_ORIGIN` to a **stable authorized app URL** as soon as one exists. Never point invitation emails at arbitrary user-provided redirect URLs.
 
-In Supabase Authentication → URL Configuration add to allowed redirects:
-https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app/invite/*
+## Tests and release gates
 
-This is a temporary preview URL. At launch update both Supabase redirects and Edge Function to a stable authorized origin such as https://app.pubbblic.com/invite/*. Never accept arbitrary redirect domains.
+1. Save a new organization invitation; confirm the row exists with correct email and role even if the mail provider is unavailable.
+2. With sender configured, click Send invitation. Confirm response accepted and track `notification_state`, `notification_delivery_provider`, `notification_sent_at`, `notification_provider_message_id`.
+3. Confirm branded email includes organization, role, expiration, and direct Join workspace CTA.
+4. New user: open email in private browser, request/signup with OTP, verify, review and explicitly accept. Confirm role.
+5. Existing user: sign in and accept. Check multiple-organization switcher and correct landing workspace.
+6. Wrong email user: cannot see or accept invitation; expired invitation cannot be accepted; duplicate acceptance is rejected or idempotently handled by RPC.
+7. Viewer cannot edit releases; Editor can edit only permitted organization content; no cross-tenant file or release reads.
+8. Verify resend cooldown, retry after provider failure, per-invitation limits, and correct user-facing messages.
+9. Supabase Security Advisor, live delivery logs and acceptance records must be reviewed before production authorization.
 
-Existing already-sent messages will NOT gain a link retroactively; resend after the cooldown, or share the copyable join URL directly.
-
-## Acceptance tests
-
-1. From Acme Agency's Team & Invitations, copy the existing pending invitation join link.
-2. Open in a private session and sign in with the exact invited verified email.
-3. Confirm the organization name and invitation role appear, then press Accept invitation and join.
-4. Confirm membership is created once, invitation becomes accepted, and organization appears in switcher.
-5. Verify Viewer can read permitted releases, cannot edit, and has no access to unrelated organizations.
-6. Test wrong-account, expired invitation, duplicate acceptance, and mail sending cooldown.
-
-An email request being accepted does not prove inbox delivery, and an email being delivered does not grant organization access.
+Invitation delivery is **not live until the separate transactional provider secrets are configured**; copying join links remains a supported manual fallback.
