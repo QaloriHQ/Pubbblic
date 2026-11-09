@@ -14,6 +14,12 @@ import { wordCount } from "@/lib/release";
 type Role = "owner" | "admin" | "editor" | "viewer";
 type Org = { id:string; name:string; role:Role };
 type Invitation = {invitation_id:string;organization_name:string;invited_role:string;expires_at:string};
+type PendingInvitation = {
+ id:string; email:string; role:string; invited_at:string; expires_at:string;
+ accepted_at:string|null; notification_state:"not_sent"|"sending"|"sent"|"failed";
+ notification_sent_at:string|null; notification_last_attempt_at:string|null;
+ notification_send_count:number;
+};
 type Membership = {user_id:string;role:Role;created_at:string};
 type ReleaseForm = {
  headline:string; summary:string; issuer:string; dateline:string;
@@ -40,6 +46,7 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
  const [orgs,setOrgs]=useState<Org[]>([]);
  const [orgId,setOrgId]=useState("");
  const [invitations,setInvitations]=useState<Invitation[]>([]);
+ const [pendingInvitations,setPendingInvitations]=useState<PendingInvitation[]>([]);
  const [releases,setReleases]=useState<Release[]>([]);
  const [members,setMembers]=useState<Membership[]>([]);
  const [assets,setAssets]=useState<Asset[]>([]);
@@ -102,6 +109,14 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
    if(e)throw e;
    setMembers((data||[]) as Membership[]);
  },[supabase]);
+ const loadPendingInvitations=useCallback(async(id:string)=>{
+   const {data,error:e}=await supabase.from("organization_invitations")
+     .select("id,email,role,invited_at,expires_at,accepted_at,notification_state,notification_sent_at,notification_last_attempt_at,notification_send_count")
+     .eq("organization_id",id).is("accepted_at",null)
+     .order("invited_at",{ascending:false});
+   if(e)throw e;
+   setPendingInvitations((data||[]) as PendingInvitation[]);
+ },[supabase]);
  const loadAssets=useCallback(async(id:string)=>{
    const {data,error:e}=await supabase.from("press_release_media").select("id,object_path,file_name,mime_type,byte_size").eq("release_id",id).order("created_at",{ascending:false});
    if(e)throw e;
@@ -117,10 +132,11 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
    return()=>{active=false};
  },[loadOrgs]);
  useEffect(()=>{
-   if(!orgId){setReleases([]);setMembers([]);return;}
+   if(!orgId){setReleases([]);setMembers([]);setPendingInvitations([]);return;}
    loadReleases(orgId).catch(e=>setError("Could not load releases: "+short(e)));
    loadMembers(orgId).catch(e=>setError("Could not load team members: "+short(e)));
- },[orgId,loadReleases,loadMembers]);
+   loadPendingInvitations(orgId).catch(e=>setError("Could not load pending invitations: "+short(e)));
+ },[orgId,loadReleases,loadMembers,loadPendingInvitations]);
  useEffect(()=>{
    if(editingId)loadAssets(editingId).catch(e=>setError("Could not load attachments: "+short(e)));
    else setAssets([]);
@@ -154,14 +170,41 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
    }catch(e){setError(short(e));}
    finally{setBusy(false);}
  }
+ async function sendInvitationEmail(invitationId:string):Promise<boolean>{
+   const {data,error:e}=await supabase.functions.invoke("notify-organization-invitation",{
+     body:{invitation_id:invitationId}
+   });
+   if(e||!data?.email_request_accepted)return false;
+   return true;
+ }
  async function inviteMember(e:React.FormEvent){
    e.preventDefault();if(!orgId||!canInvite)return;
    setBusy(true);setError("");setNotice("");
    try{
-     const {error:e}=await supabase.rpc("invite_organization_member",{p_organization_id:orgId,p_email:inviteEmail.trim().toLowerCase(),p_role:inviteRole});
+     const {data:invitationId,error:e}=await supabase.rpc("invite_organization_member",{
+       p_organization_id:orgId,p_email:inviteEmail.trim().toLowerCase(),p_role:inviteRole
+     });
      if(e)throw e;
-     setNotice("Invitation recorded. Ask this person to sign in using the invited email; the invitation will appear in their workspace.");
+     // The invitation is persisted first. Email sending is a separate, fallible action.
+     await loadPendingInvitations(orgId);
+     const sent=await sendInvitationEmail(String(invitationId));
+     await loadPendingInvitations(orgId);
+     setNotice(sent
+       ?"Invitation saved. Supabase accepted a sign-in verification email request. The recipient must sign in and accept the invitation."
+       :"Invitation saved, but the email could not be requested. Use Send email in the Pending invitations list to retry.");
      setInviteEmail("");
+   }catch(e){setError(short(e));}
+   finally{setBusy(false);}
+ }
+ async function resendInvitation(invitationId:string){
+   if(!orgId||!canInvite)return;
+   setBusy(true);setError("");setNotice("");
+   try{
+     const sent=await sendInvitationEmail(invitationId);
+     await loadPendingInvitations(orgId);
+     setNotice(sent
+       ?"Sign-in email requested. Inbox delivery is not guaranteed; the invitee must still accept their invitation."
+       :"Email request was not accepted. The invitation remains saved. Check the email service and retry after the cooldown.");
    }catch(e){setError(short(e));}
    finally{setBusy(false);}
  }
@@ -317,10 +360,31 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
              </aside>
            </div>}
            </>}
-           {tab==="team"&&<><div className="cloud-heading"><div><span className="cloud-tag">ORGANIZATION ACCESS</span><h1>People and permissions</h1><p>Keep each organization's content accessible only to authorized team members.</p></div></div>
+           {tab==="team"&&<><div className="cloud-heading"><div><span className="cloud-tag">ORGANIZATION ACCESS</span><h1>People and permissions</h1><p>Manage accepted members and pending invitations separately.</p></div></div>
              <div className="cloud-two-col"><section className="cloud-panel cloud-team"><h2>Organization members</h2><p>Your role: <strong>{org?.role}</strong></p>{members.map(m=><div className="cloud-member" key={m.user_id}><span><UsersIcon width={18}/>{m.user_id===userId?userEmail||"You":m.user_id.slice(0,8)+"…"}</span><b>{m.role}</b></div>)}</section>
-               <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Invitations are matched against a verified login email. Pubbblic doesn't expose organization records to people who haven't accepted an invite.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">Create invitation <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
-             </div></>}
+               <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Save an organization invitation and request an email verification code through Pubbblic's existing Supabase/Zoho mailer. The recipient signs in and accepts the invitation.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">{busy?"Processing…":"Create invitation & send access email"} <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
+             </div>
+             {canInvite&&<section className="cloud-panel cloud-pending-invitations">
+               <div className="cloud-panel-head"><div><h2>Pending invitations</h2><p>Invitation records are saved in Supabase; an email request is a separate step.</p></div><span>{pendingInvitations.length} pending</span></div>
+               {pendingInvitations.length===0?<div className="cloud-empty"><UsersIcon width={27}/><p>No pending invitations for this organization.</p></div>:
+                 pendingInvitations.map(inv=>{
+                   const recentlyAttempted=!!inv.notification_last_attempt_at && Date.now()-new Date(inv.notification_last_attempt_at).getTime()<120000;
+                   const expired=new Date(inv.expires_at).getTime()<=Date.now();
+                   const limitReached=inv.notification_send_count>=5;
+                   return <div className="cloud-pending-row" key={inv.id}>
+                     <div className="cloud-pending-person"><strong>{inv.email}</strong><span>{inv.role} · expires {fmtDate(inv.expires_at)}</span></div>
+                     <div className="cloud-pending-state">
+                       <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?"Email requested":inv.notification_state==="failed"?"Request failed":inv.notification_state==="sending"?"Request pending":"Email not requested"}</span>
+                       {inv.notification_sent_at&&<small>Requested {fmtDate(inv.notification_sent_at)}</small>}
+                     </div>
+                     <button className="cloud-button secondary" type="button" disabled={busy||recentlyAttempted||expired||limitReached} onClick={()=>resendInvitation(inv.id)}>
+                       {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at?"Resend email":"Send email"}
+                     </button>
+                   </div>;
+                 })}
+               <p className="cloud-pending-footnote">Emails contain a verification code for Pubbblic sign-in. An accepted email request does not prove inbox delivery or invitation acceptance. The invited user must sign in and select Accept.</p>
+             </section>}
+           </>}
            {tab==="settings"&&<><div className="cloud-heading"><div><span className="cloud-tag">ACCOUNT & SECURITY</span><h1>Workspace settings</h1><p>Access and storage controls for your organization.</p></div></div>
              <section className="cloud-panel cloud-team"><h2>Your account</h2><p><strong>Authenticated email:</strong> {userEmail}</p><p><strong>Active organization:</strong> {org?.name}</p><p><strong>Access role:</strong> {org?.role}</p><p><strong>Release storage:</strong> Supabase PostgreSQL with RLS and immutable version snapshots</p><p><strong>Media:</strong> private bucket, scoped storage policies, temporary signed links</p><p><strong>Live publisher distribution:</strong> disabled pending security and permissions review</p><button className="cloud-button secondary" onClick={signOut} disabled={busy}>Sign out</button></section>
            </>}
