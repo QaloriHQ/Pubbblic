@@ -397,14 +397,14 @@ export function CloudWorkspace({userId,userEmail,initialOrgId=""}:{userId:string
                    return <div className="cloud-pending-row" key={inv.id}>
                      <div className="cloud-pending-person"><strong>{inv.email}</strong><span>{inv.role} · expires {fmtDate(inv.expires_at)}</span></div>
                      <div className="cloud-pending-state">
-                       <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?"Sent to provider":inv.notification_state==="failed"?"Delivery failed":inv.notification_state==="sending"?"Sending…":"Not sent"}</span>
-                       {inv.notification_sent_at&&<small>Provider accepted {fmtDate(inv.notification_sent_at)}{inv.notification_delivery_provider?" · "+inv.notification_delivery_provider:""}</small>}
+                       <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?(inv.notification_delivery_provider?"Sent to provider":"Legacy sign-in email"):inv.notification_state==="failed"?"Delivery failed":inv.notification_state==="sending"?"Sending…":"Not sent"}</span>
+                       {inv.notification_sent_at&&<small>{inv.notification_delivery_provider?"Provider accepted ":"Previous Auth email "}{fmtDate(inv.notification_sent_at)}{inv.notification_delivery_provider?" · "+inv.notification_delivery_provider:""}</small>}
                        {inv.notification_last_error&&<small>Last attempt: {inv.notification_last_error.replaceAll("_"," ")}</small>}
                      </div>
                      <div className="cloud-invite-row-actions">
                        <button className="cloud-button secondary" type="button" disabled={expired||busy} onClick={()=>copyInvitationLink(inv.id)}>Copy join link</button>
                        <button className="cloud-button secondary" type="button" disabled={busy||recentlyAttempted||expired||limitReached} onClick={()=>resendInvitation(inv.id)}>
-                         {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at?"Resend invitation":"Send invitation"}
+                         {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at&&inv.notification_delivery_provider?"Resend invitation":"Send invitation"}
                        </button>
                      </div>
                    </div>;

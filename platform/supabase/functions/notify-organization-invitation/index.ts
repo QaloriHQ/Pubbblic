@@ -14,7 +14,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const sendLimit = 5;
 const attemptLimit = 10;
 const cooldownMs = 120_000;
-const defaultPreviewOrigin = "https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app";
+const defaultPreviewOrigin = "https://pubbblic-platform-71mnercfm-qaloris-projects.vercel.app";
 const respond = (payload: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(payload), { status, headers });
 

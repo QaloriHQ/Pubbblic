@@ -21,7 +21,7 @@ Set these as secrets for the Pubbblic Supabase project, not in the browser or Gi
 ```env
 INVITATION_EMAIL_PROVIDER=zoho
 INVITATION_FROM_EMAIL=hello@pubbblic.com
-PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app
+PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-71mnercfm-qaloris-projects.vercel.app
 ZOHO_MAIL_ACCOUNT_ID=<Zoho Mail account ID for hello@pubbblic.com>
 ZOHO_OAUTH_CLIENT_ID=<client-id>
 ZOHO_OAUTH_CLIENT_SECRET=<client-secret>
@@ -38,7 +38,7 @@ Resources:
 ```env
 INVITATION_EMAIL_PROVIDER=resend
 INVITATION_FROM_EMAIL=hello@pubbblic.com
-PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app
+PUBBBLIC_APP_ORIGIN=https://pubbblic-platform-71mnercfm-qaloris-projects.vercel.app
 RESEND_API_KEY=<verified-sender-domain-Resend-key>
 ```
 
