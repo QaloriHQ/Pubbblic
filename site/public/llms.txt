@@ -1,0 +1,54 @@
+# Pubbblic
+
+> Pubbblic is a press release writing and distribution platform in development, a Mahtco company. It is designed around one customer-approved announcement, publisher-specific editorial preparation, authorized distribution through Pubbblic-managed accounts, and transparent publication reporting.
+
+**Current status:** Pubbblic is in prelaunch development. The public website describes planned product capabilities and provides press release education. Live publisher distribution, DeepSeek-powered rewrites, paid campaigns, guaranteed placements, and customer publishing are not yet offered through the public marketing site.
+
+**Important distinctions:** Pubbblic does not ask customers to connect their own publisher accounts. Publisher-specific rewrites are intended to preserve the approved facts; AI-generated claims should not be treated as verified without review. A submission receipt is not proof of publication. Individual publishers retain editorial control, and coverage or search rankings are not guaranteed.
+
+## Start Here
+
+- [Pubbblic Home](https://pubbblic.com/): Official marketing site and prelaunch information.
+- [How It Works](https://pubbblic.com/how-it-works): Planned steps from an approved source release to editorial adaptations, permitted submission, and reporting.
+- [Press Release Distribution](https://pubbblic.com/press-release-distribution): Distribution process, publisher acceptance, and the difference between submission and publication.
+- [Press Release Writing](https://pubbblic.com/press-release-writing): How to prepare a clear and factual announcement.
+- [Pricing](https://pubbblic.com/pricing): Current pricing information and prelaunch status.
+
+## Planned Platform Capabilities
+
+- [AI Rewriting](https://pubbblic.com/features/ai-rewriting): Planned publisher-specific adaptations powered by DeepSeek, with factual-consistency checks.
+- [Publisher Network](https://pubbblic.com/features/publisher-network): Planned authorized publisher inventory and Pubbblic-managed destination accounts.
+- [Editorial Review](https://pubbblic.com/features/editorial-review): Editorial safeguards and approval considerations.
+- [Distribution Reporting](https://pubbblic.com/features/reporting): Planned distinction between submitted, in review, accepted, and verified live publications.
+
+## Press Release Guides
+
+- [Resource Center](https://pubbblic.com/resources): Press release education and practical resources.
+- [How to Write a Press Release](https://pubbblic.com/guides/how-to-write-a-press-release): Core writing principles and structure.
+- [Press Release Format](https://pubbblic.com/guides/press-release-format): Standard press release components.
+- [Press Release Examples](https://pubbblic.com/guides/press-release-examples): Examples and drafting considerations.
+- [Press Release SEO](https://pubbblic.com/guides/press-release-seo): Search-friendly, factual announcement writing.
+- [When to Send a Press Release](https://pubbblic.com/guides/when-to-send-a-press-release): Timing and newsworthiness.
+
+## Who Pubbblic Is For
+
+- [Startups](https://pubbblic.com/solutions/startups): Product launches and important milestones.
+- [PR Agencies](https://pubbblic.com/solutions/agencies): Multi-client review and reporting needs.
+- [Brands](https://pubbblic.com/solutions/brands): Corporate announcements and consistency.
+- [SaaS Companies](https://pubbblic.com/solutions/saas): Software announcements and launches.
+- [Ecommerce](https://pubbblic.com/solutions/ecommerce): Ecommerce and retail news.
+
+## Company and Policies
+
+- [About Pubbblic](https://pubbblic.com/about): Background and mission.
+- [Frequently Asked Questions](https://pubbblic.com/faq): Key product and distribution questions.
+- [Contact](https://pubbblic.com/contact): Official inquiry information.
+- [Privacy](https://pubbblic.com/privacy): Privacy information.
+- [Terms](https://pubbblic.com/terms): Website terms.
+- [Mahtco](https://mahtco.com): Parent company.
+- [XML Sitemap](https://pubbblic.com/sitemap.xml): Discovery of public marketing pages.
+
+## Optional
+
+- [Technology Industry](https://pubbblic.com/industries/technology): Industry-focused press release considerations.
+- [Real Estate Industry](https://pubbblic.com/industries/real-estate): Industry-focused press release considerations.

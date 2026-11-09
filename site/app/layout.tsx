@@ -16,6 +16,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const org = { "@context": "https://schema.org", "@type": "Organization", name: "Pubbblic", url: base, description: "Pubbblic is building a press release distribution platform with publisher-specific editorial preparation and verifiable delivery reporting." };
   return (
     <html lang="en">
+      <head>
+        <link rel="describedby" type="text/markdown" href="/llms.txt" />
+      </head>
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(org).replace(/</g, "\\u003c") }} />
         <Header />
