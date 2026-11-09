@@ -56,6 +56,7 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
  const [notice,setNotice]=useState("");
  const [uploading,setUploading]=useState(false);
  const [mobileOpen,setMobileOpen]=useState(false);
+ const [checklistOpen,setChecklistOpen]=useState(false);
 
  const org=orgs.find(x=>x.id===orgId);
  const canWrite=org?.role==="owner"||org?.role==="admin"||org?.role==="editor";
@@ -271,7 +272,7 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
                {!releases.length?<div className="cloud-empty"><DocumentTextIcon width={28}/><p>No releases yet.</p></div>:releases.map(r=><div className="cloud-release-item" key={r.id}><DocumentTextIcon width={22}/><div><strong>{r.headline||"Untitled draft"}</strong><small>{r.category} · Version {r.version} · {fmtDate(r.updated_at)}</small></div><button onClick={()=>editRelease(r)}>Open</button>{canWrite&&<button className="cloud-archive" onClick={()=>archiveRelease(r)} disabled={busy}>Archive</button>}</div>)}
              </section></>}
            {tab==="editor"&&<><div className="cloud-heading cloud-editor-heading"><div><button className="cloud-back" onClick={()=>switchTab("releases")}><ArrowLeftIcon width={16}/> Back to releases</button><span className="cloud-tag">RELEASE EDITOR</span><h1>{editingId?"Edit press release":"Create a press release"}</h1><p>Every save creates an immutable revision in your organization&apos;s workspace.</p></div>{canWrite&&<button className="cloud-button" onClick={()=>saveRelease()} disabled={busy}>{busy?"Saving…":"Save release"} <ArrowRightIcon width={17}/></button>}</div>
-             {!canWrite?<div className="cloud-panel cloud-empty"><LockClosedIcon width={27}/><p>This organization role is read-only.</p></div>:<div className="cloud-editor-grid"><form className="cloud-panel cloud-editor" onSubmit={saveRelease}>
+             {!canWrite?<div className="cloud-panel cloud-empty"><LockClosedIcon width={27}/><p>This organization role is read-only.</p></div>:<div className="cloud-editor-layout"><form className="cloud-panel cloud-editor cloud-editor-wide" onSubmit={saveRelease}>
                <h2>Announcement details</h2><Field title="Headline" required hint={form.headline.length+"/140 characters"}><input maxLength={140} value={form.headline} onChange={e=>field("headline",e.target.value)} placeholder="Company announces a verified new milestone"/></Field>
                <Field title="Summary" required hint={form.summary.length+"/320 characters"}><textarea maxLength={320} rows={3} value={form.summary} onChange={e=>field("summary",e.target.value)} placeholder="Summarize what happened and who it affects."/></Field>
                <div className="cloud-fields-two"><Field title="Organization / issuer"><input value={form.issuer} maxLength={160} onChange={e=>field("issuer",e.target.value)} placeholder="Company name"/></Field><Field title="Announcement type"><select value={form.category} onChange={e=>field("category",e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></Field></div>
@@ -281,10 +282,40 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
                <Field title="Company boilerplate"><textarea rows={3} maxLength={10000} value={form.boilerplate} onChange={e=>field("boilerplate",e.target.value)}/></Field>
                <h2>Media contact</h2><div className="cloud-fields-two"><Field title="Contact name"><input value={form.contact_name} maxLength={160} onChange={e=>field("contact_name",e.target.value)}/></Field><Field title="Contact email"><input type="email" value={form.contact_email} maxLength={254} onChange={e=>field("contact_email",e.target.value)}/></Field></div>
                <button className="cloud-button" type="submit" disabled={busy}>{busy?"Saving…":editingId?"Save new revision":"Create draft"} <ArrowRightIcon width={17}/></button>
-             </form><aside className="cloud-editor-side"><section className="cloud-panel cloud-checks"><span className="cloud-tag">EDITORIAL COMPLETENESS</span><h2>{checksDone}/{checks.length} checks</h2><div className="cloud-progress"><span style={{width:(checksDone/checks.length*100)+"%"}}/></div>{checks.map(c=><div key={c.label}><span className={c.valid?"ok":"pending"}>{c.valid?<CheckCircleIcon width={18}/>:<ExclamationCircleIcon width={18}/>}</span>{c.label}</div>)}<small>These are drafting checks, not publisher acceptance or verified factual approval.</small></section>
-             <section className="cloud-panel cloud-release-preview"><span className="cloud-tag">LIVE DRAFT PREVIEW</span><h2>{form.headline||"Your headline appears here"}</h2><p className="cloud-summary">{form.summary||"A concise summary introduces the announcement."}</p><small>{form.dateline||"CITY — DATE"}</small>{form.body.trim().split(/\n\s*\n/).filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}{form.quote_text&&<blockquote>“{form.quote_text}”{form.quote_attribution&&<cite> — {form.quote_attribution}</cite>}</blockquote>}{form.boilerplate&&<p><strong>About {form.issuer||"the organization"}</strong><br/>{form.boilerplate}</p>}<div className="cloud-preview-badge">DRAFT · NOT PUBLISHED</div></section>
-             {editingId&&<section className="cloud-panel cloud-assets"><span className="cloud-tag">PRIVATE MEDIA STORAGE</span><h2>Supporting files</h2><p>Upload one PDF or image at a time, up to 10 MB. Files are private to authorized organization members.</p><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={e=>{const file=e.target.files?.[0];if(file)uploadAsset(file);e.currentTarget.value="";}}/><div className="cloud-assets-list">{assets.map(a=><button key={a.id} onClick={()=>openAsset(a)}><CloudArrowUpIcon width={17}/>{a.file_name}<span>{Math.round(a.byte_size/1024)} KB</span></button>)}</div>{uploading&&<small>Uploading…</small>}</section>}
-             </aside></div>}
+             </form>
+             <section className="cloud-panel cloud-release-preview cloud-release-preview-wide" aria-label="Live draft preview">
+               <div className="cloud-preview-heading">
+                 <div><span className="cloud-tag">LIVE DRAFT PREVIEW</span><p>Review the complete announcement as your readers would see it. Changes appear here instantly.</p></div>
+                 <span className="cloud-preview-state">DRAFT · NOT PUBLISHED</span>
+               </div>
+               <article className="cloud-preview-document">
+                 <h2>{form.headline||"Your headline appears here"}</h2>
+                 <p className="cloud-summary">{form.summary||"A concise summary introduces the announcement."}</p>
+                 <div className="cloud-preview-dateline">{form.dateline||"CITY — DATE"}</div>
+                 {form.body.trim()?form.body.trim().split(/\n\s*\n/).filter(Boolean).map((p,i)=><p key={i}>{p}</p>):<p>Start writing the announcement to preview it here.</p>}
+                 {form.quote_text&&<blockquote>“{form.quote_text}”{form.quote_attribution&&<cite> — {form.quote_attribution}</cite>}</blockquote>}
+                 {form.boilerplate&&<div className="cloud-preview-section"><h3>About {form.issuer||"the organization"}</h3><p>{form.boilerplate}</p></div>}
+                 {(form.contact_name||form.contact_email)&&<div className="cloud-preview-section"><h3>Media contact</h3><p>{form.contact_name}{form.contact_name&&form.contact_email&&<br/>}{form.contact_email}</p></div>}
+               </article>
+               <div className="cloud-preview-footer">Private workspace preview · No publishing action is performed here.</div>
+             </section>
+             {editingId&&<section className="cloud-panel cloud-assets cloud-assets-wide"><span className="cloud-tag">PRIVATE MEDIA STORAGE</span><h2>Supporting files</h2><p>Upload one PDF or image at a time, up to 10 MB. Files are private to authorized organization members.</p><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={e=>{const file=e.target.files?.[0];if(file)uploadAsset(file);e.currentTarget.value="";}}/><div className="cloud-assets-list">{assets.map(a=><button key={a.id} onClick={()=>openAsset(a)}><CloudArrowUpIcon width={17}/>{a.file_name}<span>{Math.round(a.byte_size/1024)} KB</span></button>)}</div>{uploading&&<small>Uploading…</small>}</section>}
+             <aside className="cloud-checklist-dock" aria-label="Editorial completeness">
+               <section id="cloud-checklist-details" className="cloud-checklist-details" role="region" aria-label="Editorial checks" hidden={!checklistOpen}>
+                 <div className="cloud-checklist-details-header"><span className="cloud-tag">EDITORIAL COMPLETENESS</span><strong>{checksDone} of {checks.length} checks passed</strong></div>
+                 <div className="cloud-checklist-progress"><span style={{width:(checksDone/checks.length*100)+"%"}}/></div>
+                 <ul>{checks.map(c=><li key={c.label}><span className={c.valid?"ok":"pending"}>{c.valid?<CheckCircleIcon width={19}/>:<ExclamationCircleIcon width={19}/>}</span><span>{c.label}</span></li>)}</ul>
+                 <p>These are drafting checks—not publisher acceptance or verified factual approval.</p>
+               </section>
+               <button type="button" className="cloud-checklist-trigger" onClick={()=>setChecklistOpen(open=>!open)} aria-expanded={checklistOpen} aria-controls="cloud-checklist-details">
+                 <span className="cloud-checklist-trigger-icon"><ShieldCheckIcon width={21}/></span>
+                 <span className="cloud-checklist-trigger-label"><strong>Editorial completeness</strong><small>{checksDone}/{checks.length} checks passed</small></span>
+                 <span className="cloud-checklist-trigger-count">{checksDone}/{checks.length}</span>
+                 <ChevronDownIcon width={18} className={checklistOpen?"cloud-checklist-chevron open":"cloud-checklist-chevron"}/>
+               </button>
+               <div className="cloud-checklist-mini-progress" aria-hidden="true"><span style={{width:(checksDone/checks.length*100)+"%"}}/></div>
+             </aside>
+           </div>}
            </>}
            {tab==="team"&&<><div className="cloud-heading"><div><span className="cloud-tag">ORGANIZATION ACCESS</span><h1>People and permissions</h1><p>Keep each organization's content accessible only to authorized team members.</p></div></div>
              <div className="cloud-two-col"><section className="cloud-panel cloud-team"><h2>Organization members</h2><p>Your role: <strong>{org?.role}</strong></p>{members.map(m=><div className="cloud-member" key={m.user_id}><span><UsersIcon width={18}/>{m.user_id===userId?userEmail||"You":m.user_id.slice(0,8)+"…"}</span><b>{m.role}</b></div>)}</section>
