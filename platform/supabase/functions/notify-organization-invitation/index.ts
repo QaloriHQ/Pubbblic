@@ -104,7 +104,12 @@ Deno.serve(async (request) => {
   try {
     const { error } = await mailer.auth.signInWithOtp({
       email: inv.email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        // The OTP template can expose {{ .RedirectTo }} as "Open invitation".
+        // Recipient still must verify ownership of the invited email and accept.
+        emailRedirectTo: "https://pubbblic-platform-l4wivtuci-qaloris-projects.vercel.app/invite/" + inv.id,
+      },
     });
     if (error) sendError = error;
     else sent = true;
