@@ -332,3 +332,42 @@
   .cloud-checklist-progress span,
   .cloud-checklist-mini-progress span{transition:none}
 }
+
+
+/* Team & invitations: distinguish saved pending records from sent access emails. */
+.cloud-pending-invitations{margin-top:20px}
+.cloud-pending-invitations .cloud-panel-head{margin-bottom:10px}
+.cloud-pending-invitations .cloud-panel-head p{font-size:12px;color:#8594aa;line-height:1.6;margin:8px 0 0}
+.cloud-pending-row{
+  display:grid;
+  grid-template-columns:minmax(190px,1fr) minmax(130px,.6fr) auto;
+  align-items:center;
+  gap:18px;
+  border-top:1px solid #edf0f5;
+  padding:19px 0;
+}
+.cloud-pending-person{min-width:0}
+.cloud-pending-person strong{font-size:13px;color:#2e3e5c;display:block;overflow-wrap:anywhere}
+.cloud-pending-person>span{display:block;color:#8997ab;font-size:11px;margin-top:7px;text-transform:capitalize}
+.cloud-pending-state{display:flex;align-items:flex-start;flex-direction:column;gap:6px}
+.cloud-pending-state>small{font-size:10px;color:#9ba7b8}
+.cloud-pending-status{
+  display:inline-flex;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:800;
+  color:#986b27;
+  background:#fff4dd;
+  padding:7px 10px;
+}
+.cloud-pending-status.sent{background:#eaf6ee;color:#26754b}
+.cloud-pending-footnote{font-size:11px;color:#8b98a9;line-height:1.7;margin:15px 0 0}
+.cloud-pending-row .cloud-button{font-size:11px;padding:11px 13px}
+@media(max-width:1000px){
+  .cloud-pending-row{grid-template-columns:minmax(190px,1fr) 1fr;gap:12px}
+  .cloud-pending-row>.cloud-button{grid-column:2;justify-self:start}
+}
+@media(max-width:600px){
+  .cloud-pending-row{display:flex;align-items:flex-start;flex-direction:column;gap:12px}
+  .cloud-pending-row>.cloud-button{align-self:flex-start}
+}
