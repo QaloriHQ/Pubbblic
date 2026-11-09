@@ -78,9 +78,10 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
     if(!invite)return;
     setAccepting(true);setError("");setNotice("");
     try{
-      const {error:e}=await supabase.rpc("accept_organization_invitation",{p_invitation_id:invitationId});
+      const {data:organizationId,error:e}=await supabase.rpc("accept_organization_invitation",{p_invitation_id:invitationId});
       if(e)throw e;
-      router.replace("/dashboard");router.refresh();
+      router.replace("/dashboard?organization="+encodeURIComponent(String(organizationId)));
+      router.refresh();
     }catch(e){setError(e instanceof Error?e.message:"Could not accept this invitation.");}
     finally{setAccepting(false);}
   }
@@ -111,7 +112,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
         </div>}
        </>:<div className="invite-card">
           <h2>Verify your invited email</h2>
-          <p>Enter the email address that received this invitation. We'll send a one-time verification code.</p>
+          <p>Whether you already have a Pubbblic account or you're joining for the first time, enter your invited email. Supabase will send a one-time verification code.</p>
           {!sent?<form onSubmit={sendCode}>
             <label htmlFor="invite-email">Invited email address</label>
             <input id="invite-email" type="email" required maxLength={254} autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)}/>

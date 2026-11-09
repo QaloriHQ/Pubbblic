@@ -41,11 +41,11 @@ function Logo(){return <div className="cloud-logo"><b>pubbblic<span>.</span></b>
 function Field({title,required=false,children,hint}:{title:string;required?:boolean;children:React.ReactNode;hint?:string}){
  return <label className="cloud-field"><span>{title}{required&&<b> *</b>}</span>{children}{hint&&<small>{hint}</small>}</label>;
 }
-export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:string}){
+export function CloudWorkspace({userId,userEmail,initialOrgId=""}:{userId:string;userEmail:string;initialOrgId?:string}){
  const supabase=useMemo(()=>createClient(),[]);
  const router=useRouter();
  const [orgs,setOrgs]=useState<Org[]>([]);
- const [orgId,setOrgId]=useState("");
+ const [orgId,setOrgId]=useState(initialOrgId);
  const [invitations,setInvitations]=useState<Invitation[]>([]);
  const [pendingInvitations,setPendingInvitations]=useState<PendingInvitation[]>([]);
  const [releases,setReleases]=useState<Release[]>([]);
