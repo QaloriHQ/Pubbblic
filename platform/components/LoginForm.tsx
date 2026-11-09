@@ -5,6 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightIcon, EnvelopeIcon, LockClosedIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
+// Match Supabase Authentication → Email OTP length (currently eight digits).
+// Supabase supports email OTP lengths from 6 to 10 digits.
+const configuredOtpLength = Number(process.env.NEXT_PUBLIC_EMAIL_OTP_LENGTH ?? "8");
+const OTP_LENGTH = Number.isInteger(configuredOtpLength) && configuredOtpLength >= 6 && configuredOtpLength <= 10
+  ? configuredOtpLength
+  : 8;
+
 export function LoginForm() {
   const router=useRouter();
   const search=useSearchParams();
@@ -26,7 +33,7 @@ export function LoginForm() {
       });
       if(error) throw error;
       setPhase("code");
-      setNotice("Check your inbox. Use the six-digit code if included, or follow the sign-in link. Codes require an OTP-enabled email template.");
+      setNotice("Check your inbox for your verification code. Enter all digits from the email, or follow the sign-in link if one was sent.");
     }catch(err){setFailure(err instanceof Error?err.message:"Could not send a sign-in email.");}
     finally{setBusy(false);}
   }
@@ -34,7 +41,7 @@ export function LoginForm() {
     e.preventDefault();setBusy(true);setFailure("");
     try {
       const supabase=createClient();
-      const {error}=await supabase.auth.verifyOtp({email:email.trim().toLowerCase(),token:otp.trim(),type:"email"});
+      const {error}=await supabase.auth.verifyOtp({email:email.trim().toLowerCase(),token:otp,type:"email"});
       if(error)throw error;
       router.replace("/dashboard");router.refresh();
     }catch(err){setFailure(err instanceof Error?err.message:"That code is invalid or expired.");}
@@ -57,9 +64,9 @@ export function LoginForm() {
         <button className="btn primary auth-submit" disabled={busy} type="submit">{busy?"Sending…":"Continue with email"}<ArrowRightIcon width={17}/></button>
       </form>:<form onSubmit={verifyCode}>
         <label htmlFor="otp-email">Email</label><input id="otp-email" type="email" value={email} readOnly/>
-        <label htmlFor="otp-code">One-time code</label><input id="otp-code" value={otp} onChange={e=>setOtp(e.target.value)} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="6-digit code" aria-describedby="otp-hint"/>
-        <small id="otp-hint">If your email contains a sign-in link rather than a code, use that link.</small>
-        <button type="submit" className="btn primary auth-submit" disabled={busy||otp.length!==6}>{busy?"Verifying…":"Verify code"}<ArrowRightIcon width={17}/></button>
+        <label htmlFor="otp-code">One-time code</label><input id="otp-code" type="text" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH))} inputMode="numeric" autoComplete="one-time-code" pattern={`[0-9]{${OTP_LENGTH}}`} minLength={OTP_LENGTH} maxLength={OTP_LENGTH} placeholder={`${OTP_LENGTH}-digit code`} aria-describedby="otp-hint" required/>
+        <small id="otp-hint">Enter the entire verification code, including any leading zeros. If the email contains a sign-in link instead, use that link.</small>
+        <button type="submit" className="btn primary auth-submit" disabled={busy||otp.length!==OTP_LENGTH}>{busy?"Verifying…":"Verify code"}<ArrowRightIcon width={17}/></button>
         <button type="button" className="auth-back" onClick={()=>{setPhase("email");setOtp("");setFailure("");setNotice("");}}>Use another email</button>
       </form>}
       {notice&&<div className="auth-notice" role="status">{notice}</div>}
