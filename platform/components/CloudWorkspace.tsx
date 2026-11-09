@@ -196,6 +196,15 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
    }catch(e){setError(short(e));}
    finally{setBusy(false);}
  }
+ async function copyInvitationLink(invitationId:string){
+   setError("");setNotice("");
+   try{
+     await navigator.clipboard.writeText(window.location.origin+"/invite/"+invitationId);
+     setNotice("Invite link copied. Share it with the intended recipient. They must verify the invited email address and explicitly accept.");
+   }catch{
+     setError("Could not copy the link. Your browser may require Clipboard permission or HTTPS.");
+   }
+ }
  async function resendInvitation(invitationId:string){
    if(!orgId||!canInvite)return;
    setBusy(true);setError("");setNotice("");
@@ -377,12 +386,15 @@ export function CloudWorkspace({userId,userEmail}:{userId:string;userEmail:strin
                        <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?"Email requested":inv.notification_state==="failed"?"Request failed":inv.notification_state==="sending"?"Request pending":"Email not requested"}</span>
                        {inv.notification_sent_at&&<small>Requested {fmtDate(inv.notification_sent_at)}</small>}
                      </div>
-                     <button className="cloud-button secondary" type="button" disabled={busy||recentlyAttempted||expired||limitReached} onClick={()=>resendInvitation(inv.id)}>
-                       {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at?"Resend email":"Send email"}
-                     </button>
+                     <div className="cloud-invite-row-actions">
+                       <button className="cloud-button secondary" type="button" disabled={expired||busy} onClick={()=>copyInvitationLink(inv.id)}>Copy join link</button>
+                       <button className="cloud-button secondary" type="button" disabled={busy||recentlyAttempted||expired||limitReached} onClick={()=>resendInvitation(inv.id)}>
+                         {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at?"Resend email":"Send email"}
+                       </button>
+                     </div>
                    </div>;
                  })}
-               <p className="cloud-pending-footnote">Emails contain a verification code for Pubbblic sign-in. An accepted email request does not prove inbox delivery or invitation acceptance. The invited user must sign in and select Accept.</p>
+               <p className="cloud-pending-footnote">The verification email currently carries a sign-in code. To make the invitation accessible directly from email, add the join button to the Supabase OTP template. Until then, use Copy join link to share the secure invitation URL. Only the matching verified account can accept.</p>
              </section>}
            </>}
            {tab==="settings"&&<><div className="cloud-heading"><div><span className="cloud-tag">ACCOUNT & SECURITY</span><h1>Workspace settings</h1><p>Access and storage controls for your organization.</p></div></div>
