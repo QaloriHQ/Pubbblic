@@ -14,8 +14,8 @@ type Invitation={invitation_id:string;organization_name:string;invited_role:stri
 const stages=[
   {name:"Secure account",detail:"Set a password",icon:LockClosedIcon},
   {name:"Workspace",detail:"Create or join",icon:BuildingOfficeIcon},
-  {name:"Team",detail:"Review invitations",icon:UserGroupIcon},
-  {name:"First release",detail:"Start authoring",icon:DocumentTextIcon},
+  {name:"Team",detail:"Optional",icon:UserGroupIcon},
+  {name:"First release",detail:"Optional",icon:DocumentTextIcon},
 ];
 function errorMessage(err:unknown){return err instanceof Error?err.message:"Unable to complete that request.";}
 export function OnboardingWizard({
@@ -183,7 +183,7 @@ export function OnboardingWizard({
     <main className="pub-onboarding-main">
       <span className="cloud-tag">PUBBBLIC STUDIO · GETTING STARTED</span>
       <h1>Set up your workspace</h1>
-      <p className="pub-onboarding-lead">Four straightforward steps to prepare your account, collaborate with your team and create your first announcement.</p>
+      <p className="pub-onboarding-lead">Secure your account and set up a workspace. Invite teammates and draft your first release now, or do either later.</p>
       <nav className="pub-onboarding-steps" aria-label="Onboarding steps">
         {stages.map((s,i)=>{
           const Icon=s.icon;
@@ -259,17 +259,24 @@ export function OnboardingWizard({
         </div>
        </section>:
        <section className="pub-onboarding-panel">
-        <span className="cloud-tag">STEP 04 · FIRST PRESS RELEASE</span>
+        <span className="cloud-tag">STEP 04 · FIRST PRESS RELEASE · OPTIONAL</span>
         <h2>{hasRelease?"Your workspace is ready":"Create your first press release"}</h2>
         <p>{org?.role==="viewer"
           ?"Your role is Viewer. You can review the organization's releases; an Editor, Admin or Owner creates announcements."
           :hasRelease
           ?"An announcement is already saved in this workspace. You're ready to continue."
           :"Start a private draft. Add a headline, summary, body and media contact; no external distribution occurs during onboarding."}</p>
-        <Link className="cloud-button pub-onboarding-action" href={
-          "/dashboard?organization="+encodeURIComponent(org?.id||"")+
-          (canWrite&&!hasRelease?"&start=editor":"")
-        }>{canWrite&&!hasRelease?"Open release editor":"Open workspace"}<ArrowRightIcon width={17}/></Link>
+        <div className="pub-onboarding-release-actions">
+          <Link className="cloud-button pub-onboarding-action" href={
+            "/dashboard?organization="+encodeURIComponent(org?.id||"")+
+            (canWrite&&!hasRelease?"&start=editor":"")
+          }>{canWrite&&!hasRelease?"Create first release":"Open workspace"}<ArrowRightIcon width={17}/></Link>
+          {canWrite&&!hasRelease&&
+            <Link className="pub-onboarding-skip" href={
+              "/dashboard?organization="+encodeURIComponent(org?.id||"")
+            }>Skip first release · Go to dashboard</Link>}
+        </div>
+        {canWrite&&!hasRelease&&<p className="pub-onboarding-helper">You can create a press release at any time from the Studio dashboard.</p>}
        </section>}
     </main>
     <footer className="pub-onboarding-footer">Secure onboarding · No external publishing · Pubbblic is a <a href="https://mahtco.com">Mahtco</a> company</footer>

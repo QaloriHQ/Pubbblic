@@ -7,7 +7,7 @@ Status: Supabase schema and Edge Functions deployed; Vercel preview built. Real-
 1. **Secure account.** Supabase Auth verifies email first; newly created users set a password (12–128 characters with uppercase, lowercase and a number) via the authenticated complete-onboarding-password Edge Function. Supabase Auth stores the password; public.user_onboarding stores only a completion timestamp.
 2. **Workspace.** Create an organization with create_organization or accept an existing invitation with accept_organization_invitation. Invitees should not create a duplicate organization.
 3. **Team and invitations (optional).** Owners and admins may invite collaborators; everyone can skip this step. The Continue and Skip controls immediately advance to the release step and record a best-effort, user-scoped progress timestamp without any privileged Edge Function dependency. Owners/admins can invite later from Team & invitations.
-4. **First press release.** Owners/admins/editors open the private release editor; Viewers open a read-only workspace. Nothing publishes externally.
+4. **First press release (optional).** Owners/admins/editors may open the private release editor or skip directly to the full Studio dashboard. Viewers open their read-only workspace. Draft creation is never required to complete onboarding, and nothing publishes externally.
 
 The /dashboard page requires only password completion and organization membership. Team setup is optional, and a failed progress write cannot block access to the first release. The /invite/[id] page directs newly authenticated invitees to password setup before permitting membership acceptance. Existing pilot accounts were grandfathered to preserve ongoing QA work; only users created after migration are required to set up a password.
 
@@ -64,3 +64,13 @@ The Acme Agency QA invitation has not been automatically accepted or resent.
 ## Nov 10 hotfix — team setup must never block
 
 A real onboarding attempt reached Step 03 and the complete-onboarding-team function returned HTTP 401. The required team-step gate has been removed from /dashboard. Both "Continue to first release" and "Skip team setup for now" advance immediately, and the optional progress timestamp is saved directly through an authenticated, column-restricted RLS policy. Inviting collaborators is still available during onboarding and later from Team & invitations. 
+
+## UX update — both team and release steps optional
+
+The **Skip team setup for now** action uses a visible outlined secondary button with the same hit-target height, rounded corners, brand-blue focus state and responsive full-width mobile treatment as other onboarding actions. On Step 4, authors may choose **Create first release** or **Skip first release · Go to dashboard**. The skip route never creates an empty draft or changes organization permissions. `/dashboard` only requires a verified session, completed password step and organization membership.
+
+### Version-controlled Invite user email
+
+The branded, table-based HTML lives at `platform/email-templates/invite-user.html` with subject **You're invited to Pubbblic**. Retain `{{ .ConfirmationURL }}` exactly: it's the native Supabase Auth verification link for **Invite user**. It is not the Pubbblic org-acceptance RPC. After verification, Pubbblic shows the correct pending invitation and requires explicit acceptance. The organization name is intentionally not interpolated because the built-in Supabase Auth email template cannot read the invitation record securely by itself.
+
+In the hosted Supabase dashboard, paste the template HTML under Authentication → Emails → Invite user, set the subject, and save. Hosted email configuration is not changed just by committing the file. The sender's redirect URL must be on the Supabase allow list. Real email confirmation and continuation still require end-to-end testing.
