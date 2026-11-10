@@ -404,3 +404,52 @@
 .cloud-invite-row-actions .cloud-button{font-size:11px;padding:10px}
 @media(max-width:770px){.invite-top{padding:17px 22px}.invite-card{padding:24px 20px}.invite-main{margin-top:34px}.cloud-pending-row>.cloud-invite-row-actions{grid-column:2}}
 @media(max-width:600px){.cloud-pending-row>.cloud-invite-row-actions{align-self:flex-start}}
+
+
+/* Guided onboarding: verified identity -> organization -> team -> first draft */
+.pub-onboarding{min-height:100vh;display:flex;flex-direction:column;background:#f7f9fd;color:#1f2c47}
+.pub-onboarding *{box-sizing:border-box}
+.pub-onboarding-header{height:82px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:#fff;border-bottom:1px solid #e5ebf6;padding:0 clamp(22px,5vw,76px)}
+.pub-onboarding-logo{font-size:29px;letter-spacing:-1.5px;font-weight:850;color:#1c2947}
+.pub-onboarding-logo span{color:#2652de}
+.pub-onboarding-logo small{font-size:10px;letter-spacing:1.5px;color:#93a1b8;font-weight:800}
+.pub-onboarding-header>div{display:flex;align-items:center;gap:22px}
+.pub-onboarding-header>div span{font-size:12px;color:#8a98ad}
+.pub-onboarding-header button{padding:10px 15px;border:1px solid #dbe3f1;border-radius:8px;background:#fff;color:#4f6284;font-size:12px;font-weight:800;cursor:pointer}
+.pub-onboarding-main{width:min(900px,calc(100% - 38px));margin:clamp(35px,7vh,75px) auto 60px;flex:1}
+.pub-onboarding-main h1{font-size:clamp(37px,5vw,58px);line-height:1.14;letter-spacing:-2px;margin:0 0 15px}
+.pub-onboarding-lead{font-size:15px;line-height:1.8;color:#7c8ba2;max-width:710px;margin:0 0 34px}
+.pub-onboarding-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:28px}
+.pub-onboarding-step{display:flex;align-items:center;gap:10px;border:1px solid #e1e8f4;border-radius:11px;background:#fff;padding:13px;min-width:0;color:#91a0b6}
+.pub-onboarding-step.current{background:#edf3ff;color:#294fb8;border-color:#bbcffb}
+.pub-onboarding-step.done{color:#238363;background:#eff9f4;border-color:#c9e8d8}
+.pub-onboarding-step-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pub-onboarding-step strong,.pub-onboarding-step small{display:block;line-height:1.35;white-space:normal}
+.pub-onboarding-step strong{font-size:11px;font-weight:850}
+.pub-onboarding-step small{font-size:10px;margin-top:4px}
+.pub-onboarding-panel{background:#fff;border:1px solid #e4eaf4;border-radius:15px;padding:clamp(24px,4vw,44px);box-shadow:0 8px 32px rgba(29,44,82,.04)}
+.pub-onboarding-panel h2{font-size:clamp(28px,3.2vw,39px);line-height:1.2;letter-spacing:-1.3px;margin:0 0 16px}
+.pub-onboarding-panel>p{max-width:730px;color:#75849d;font-size:14px;line-height:1.85;margin:0 0 28px}
+.pub-onboarding-panel form{display:flex;flex-direction:column;gap:11px;max-width:640px;margin-bottom:26px}
+.pub-onboarding-panel label{font-size:12px;font-weight:800;color:#3d4c67}
+.pub-onboarding-panel form input:not([type="checkbox"]),.pub-onboarding-panel select{background:#fff;border:1px solid #dce4f0;border-radius:9px;padding:13px 15px;color:#21314d;font-size:14px;min-width:0;width:100%}
+.pub-onboarding-panel form input:focus,.pub-onboarding-panel select:focus{outline:3px solid #dae5ff}
+.pub-onboarding-panel form small{font-size:11px;color:#8693ab;line-height:1.7}
+.pub-onboarding-check{display:flex;align-items:center;gap:10px;font-weight:550!important}
+.pub-onboarding-check input{width:16px;height:16px;accent-color:#2652de}
+.pub-onboarding-action{align-self:flex-start;margin-top:14px;font-size:13px;text-decoration:none;cursor:pointer}
+.pub-onboarding-invites{padding:20px;border:1px solid #e1e9f6;border-radius:12px;background:#f8faff;margin:18px 0 29px}
+.pub-onboarding-panel h3{font-size:17px;color:#304263;margin:2px 0 17px}
+.pub-onboarding-invite{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #e7ecf7;padding:15px 0}
+.pub-onboarding-invite:first-of-type{border-top:0}
+.pub-onboarding-invite strong{display:block;font-size:14px;color:#2e4166}
+.pub-onboarding-invite small{display:block;font-size:11px;color:#8494ac;margin-top:6px;text-transform:capitalize}
+.pub-onboarding-note{padding:14px 16px;border-radius:10px;background:#f4f6fa;color:#6c7e99!important;font-size:12px!important}
+.pub-onboarding-footer{text-align:center;padding:20px 16px;color:#91a0b5;font-size:11px;border-top:1px solid #e5eaf3}
+.pub-onboarding-footer a{color:#4369bb}
+@media(max-width:800px){.pub-onboarding-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){
+.pub-onboarding-header{padding:0 18px;height:72px}.pub-onboarding-logo{font-size:24px}.pub-onboarding-header>div{gap:8px}.pub-onboarding-header>div span{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pub-onboarding-steps{gap:7px}.pub-onboarding-step{padding:10px 8px;gap:6px}.pub-onboarding-step strong{font-size:10px}.pub-onboarding-step small{font-size:9px}
+.pub-onboarding-invite{flex-direction:column;align-items:flex-start}.pub-onboarding-panel .cloud-button{white-space:normal}
+}
