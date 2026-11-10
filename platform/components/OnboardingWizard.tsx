@@ -41,7 +41,7 @@ export function OnboardingWizard({
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
 
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(preferOrgId?:string)=>{
     const [profileResult,memberResult,invitationResult]=await Promise.all([
       supabase.from("user_onboarding").select("password_set_at,invitations_reviewed_at").eq("user_id",userId).single(),
       supabase.from("organization_memberships").select("organization_id,role").eq("user_id",userId),
@@ -62,7 +62,7 @@ export function OnboardingWizard({
       const org=organizations.find(o=>o.id===member.organization_id);
       return org?[{id:org.id,name:org.name,role:member.role as Organization["role"]}]:[];
     });
-    const selected=next.find(o=>o.id===activeOrgId)||
+    const selected=next.find(o=>o.id===preferOrgId)||next.find(o=>o.id===activeOrgId)||
       next.find(o=>o.id===preferredOrgId)||next[0];
     let releaseExists=false;
     if(selected){
@@ -124,7 +124,7 @@ export function OnboardingWizard({
       const {data,error:e}=await supabase.rpc("create_organization",{p_name:name.trim()});
       if(e)throw e;
       setActiveOrgId(String(data));
-      await refresh();
+      await refresh(String(data));
       setNotice("Organization created. You are its Owner.");
     });
   }
@@ -133,7 +133,7 @@ export function OnboardingWizard({
       const {data,error:e}=await supabase.rpc("accept_organization_invitation",{p_invitation_id:id});
       if(e)throw e;
       setActiveOrgId(String(data));
-      await refresh();
+      await refresh(String(data));
       setNotice("Invitation accepted. Your organization access is active.");
     });
   }

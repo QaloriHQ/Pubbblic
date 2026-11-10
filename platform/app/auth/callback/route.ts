@@ -10,10 +10,10 @@ export async function GET(req: NextRequest) {
   const supabase=await createClient();
   if(code) {
     const {error}=await supabase.auth.exchangeCodeForSession(code);
-    if(!error) return NextResponse.redirect(new URL("/dashboard",url.origin));
-  } else if(tokenHash && (type==="email"||type==="magiclink"||type==="signup")) {
-    const {error}=await supabase.auth.verifyOtp({ token_hash:tokenHash, type:type as "email"|"magiclink"|"signup" });
-    if(!error) return NextResponse.redirect(new URL("/dashboard",url.origin));
+    if(!error) return NextResponse.redirect(new URL("/onboarding",url.origin));
+  } else if(tokenHash && (type==="email"||type==="magiclink"||type==="signup"||type==="invite")) {
+    const {error}=await supabase.auth.verifyOtp({ token_hash:tokenHash, type:type as "email"|"magiclink"|"signup"|"invite" });
+    if(!error) return NextResponse.redirect(new URL("/onboarding",url.origin));
   }
   return NextResponse.redirect(new URL("/login?error=expired_link",url.origin));
 }

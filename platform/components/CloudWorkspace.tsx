@@ -41,7 +41,9 @@ function Logo(){return <div className="cloud-logo"><b>pubbblic<span>.</span></b>
 function Field({title,required=false,children,hint}:{title:string;required?:boolean;children:React.ReactNode;hint?:string}){
  return <label className="cloud-field"><span>{title}{required&&<b> *</b>}</span>{children}{hint&&<small>{hint}</small>}</label>;
 }
-export function CloudWorkspace({userId,userEmail,initialOrgId=""}:{userId:string;userEmail:string;initialOrgId?:string}){
+export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="home"}:{
+ userId:string;userEmail:string;initialOrgId?:string;initialTab?:"home"|"releases"|"editor"|"team"|"settings"
+}){
  const supabase=useMemo(()=>createClient(),[]);
  const router=useRouter();
  const [orgs,setOrgs]=useState<Org[]>([]);
@@ -51,7 +53,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId=""}:{userId:string
  const [releases,setReleases]=useState<Release[]>([]);
  const [members,setMembers]=useState<Membership[]>([]);
  const [assets,setAssets]=useState<Asset[]>([]);
- const [tab,setTab]=useState<Tab>("home");
+ const [tab,setTab]=useState<Tab>(initialTab);
  const [form,setForm]=useState<ReleaseForm>({...blank});
  const [editingId,setEditingId]=useState<string|null>(null);
  const [editingVersion,setEditingVersion]=useState(0);
@@ -69,6 +71,9 @@ export function CloudWorkspace({userId,userEmail,initialOrgId=""}:{userId:string
  const org=orgs.find(x=>x.id===orgId);
  const canWrite=org?.role==="owner"||org?.role==="admin"||org?.role==="editor";
  const canInvite=org?.role==="owner"||org?.role==="admin";
+ useEffect(()=>{
+   if(tab==="editor"&&orgs.length>0&&!canWrite)setTab("home");
+ },[tab,orgs.length,canWrite]);
  const currentRelease=releases.find(x=>x.id===editingId);
  const checks=[
   {label:"Clear headline",valid:form.headline.trim().length>=15&&form.headline.length<=140},

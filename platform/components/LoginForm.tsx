@@ -17,7 +17,8 @@ export function LoginForm() {
   const search=useSearchParams();
   const [email,setEmail]=useState("");
   const [otp,setOtp]=useState("");
-  const [phase,setPhase]=useState<"email"|"code">("email");
+  const [phase,setPhase]=useState<"email"|"code"|"password">("email");
+  const [signInPassword,setSignInPassword]=useState("");
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
   const [failure,setFailure]=useState("");
@@ -43,8 +44,21 @@ export function LoginForm() {
       const supabase=createClient();
       const {error}=await supabase.auth.verifyOtp({email:email.trim().toLowerCase(),token:otp,type:"email"});
       if(error)throw error;
-      router.replace("/dashboard");router.refresh();
+      router.replace("/onboarding");router.refresh();
     }catch(err){setFailure(err instanceof Error?err.message:"That code is invalid or expired.");}
+    finally{setBusy(false);}
+  }
+  async function signInUsingPassword(e:React.FormEvent){
+    e.preventDefault();setBusy(true);setFailure("");setNotice("");
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.auth.signInWithPassword({
+        email:email.trim().toLowerCase(),password:signInPassword
+      });
+      if(error)throw error;
+      setSignInPassword("");
+      router.replace("/onboarding");router.refresh();
+    }catch(err){setFailure(err instanceof Error?err.message:"Could not sign in. Check your credentials.");}
     finally{setBusy(false);}
   }
   return <div className="auth-page"><div className="auth-left">
@@ -54,14 +68,22 @@ export function LoginForm() {
   </div><div className="auth-right"><div className="auth-panel">
     <span className="auth-card-icon"><EnvelopeIcon width={23}/></span>
     <span className="eyebrow">PUBBBLIC ACCOUNT</span>
-    <h2>{phase==="email"?"Sign in or create an account":"Check your email"}</h2>
-    <p>Secure, passwordless access to your organization workspace.</p>
+    <h2>{phase==="email"?"Sign in or create an account":phase==="password"?"Sign in with password":"Check your email"}</h2>
+    <p>Sign in with your password, or use a verification code to create an account or recover access.</p>
     {!configured ? <div className="auth-error">Authentication is not activated for this deployment. A dedicated Pubbblic Supabase project must be connected before accounts can be created.</div> : <>
       {initialError && <div className="auth-error">The sign-in link is unavailable or has expired. Request a new sign-in email.</div>}
       {phase==="email"?<form onSubmit={sendCode}>
         <label htmlFor="sign-in-email">Email address</label>
         <input id="sign-in-email" autoComplete="email" required type="email" maxLength={254} value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/>
         <button className="btn primary auth-submit" disabled={busy} type="submit">{busy?"Sending…":"Continue with email"}<ArrowRightIcon width={17}/></button>
+        <button type="button" className="auth-back" onClick={()=>{setPhase("password");setFailure("");setNotice("");}}>Sign in with a password instead</button>
+      </form>:phase==="password"?<form onSubmit={signInUsingPassword}>
+        <label htmlFor="password-sign-in-email">Email address</label>
+        <input id="password-sign-in-email" type="email" required maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+        <label htmlFor="password-sign-in">Password</label>
+        <input id="password-sign-in" type="password" required autoComplete="current-password" value={signInPassword} onChange={e=>setSignInPassword(e.target.value)}/>
+        <button className="btn primary auth-submit" disabled={busy} type="submit">{busy?"Signing in…":"Sign in"}<ArrowRightIcon width={17}/></button>
+        <button type="button" className="auth-back" onClick={()=>{setPhase("email");setFailure("");setNotice("");setSignInPassword("");}}>Use email verification instead</button>
       </form>:<form onSubmit={verifyCode}>
         <label htmlFor="otp-email">Email</label><input id="otp-email" type="email" value={email} readOnly/>
         <label htmlFor="otp-code">One-time code</label><input id="otp-code" type="text" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH))} inputMode="numeric" autoComplete="one-time-code" pattern={`[0-9]{${OTP_LENGTH}}`} minLength={OTP_LENGTH} maxLength={OTP_LENGTH} placeholder={`${OTP_LENGTH}-digit code`} aria-describedby="otp-hint" required/>

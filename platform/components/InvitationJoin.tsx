@@ -34,6 +34,12 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
       if(e||!user?.email||!user.email_confirmed_at){
         setSignedInEmail(null);setInvite(null);return;
       }
+      const {data:profile,error:profileError}=await supabase.from("user_onboarding")
+        .select("password_set_at").eq("user_id",user.id).maybeSingle();
+      if(profileError||!profile||!profile.password_set_at){
+        router.replace("/onboarding?invite="+encodeURIComponent(invitationId));
+        return;
+      }
       setSignedInEmail(user.email);
       const {data,error:invErr}=await supabase.rpc("my_organization_invitations");
       if(invErr)throw invErr;
@@ -42,7 +48,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
     } catch(err){
       setError(err instanceof Error?err.message:"Could not load this invitation.");
     } finally {setChecking(false);}
-  },[invitationId,supabase]);
+  },[invitationId,supabase,router]);
 
   useEffect(()=>{void loadInvitation();},[loadInvitation]);
   async function sendCode(e:React.FormEvent){
@@ -81,7 +87,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
     try{
       const {data:organizationId,error:e}=await supabase.rpc("accept_organization_invitation",{p_invitation_id:invitationId});
       if(e)throw e;
-      router.replace("/dashboard?organization="+encodeURIComponent(String(organizationId)));
+      router.replace("/onboarding?organization="+encodeURIComponent(String(organizationId)));
       router.refresh();
     }catch(e){setError(e instanceof Error?e.message:"Could not accept this invitation.");}
     finally{setAccepting(false);}
