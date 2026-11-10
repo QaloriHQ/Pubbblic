@@ -28,7 +28,7 @@ No additional Zoho Mail API or Resend integration is required.
 1. Authentication → Emails → **Invite user**: retain the link placeholder {{ .ConfirmationURL }} and brand the email for newly invited Pubbblic users.
 2. Authentication → Emails → **Magic link or OTP**: retain {{ .Token }} (this project's eight-digit code), and add a generic Open Pubbblic link with href="{{ .RedirectTo }}" to take existing users to the invitation URL.
 3. Authentication → Emails → **Confirm sign up**: retain {{ .Token }}; optionally add the same generic Open Pubbblic link for standard registration.
-4. Authentication → URL Configuration: allow the QA preview redirect https://pubbblic-platform-hosr12xie-qaloris-projects.vercel.app/invite/* and the matching /auth/callback as needed. When an approved stable staging/application domain exists, use that origin instead, update the redirect allowlist, and set PUBBBLIC_APP_ORIGIN to match. Previews are not permanent production URLs.
+4. Authentication → URL Configuration: allow the QA preview redirect https://pubbblic-platform-5nehj6it1-qaloris-projects.vercel.app/invite/* and the matching /auth/callback as needed. When an approved stable staging/application domain exists, use that origin instead, update the redirect allowlist, and set PUBBBLIC_APP_ORIGIN to match. Previews are not permanent production URLs.
 5. Authentication → Providers → Email: ensure email/password auth is permitted; configure appropriate password length, email limits, and enable leaked-password protection before customer release. Supabase Security Advisor currently warns that leaked-password protection is disabled.
 
 Do not paste provider credentials or passwords into GitHub, logs, or chat. Supabase Auth sends through the existing Zoho SMTP connection.
