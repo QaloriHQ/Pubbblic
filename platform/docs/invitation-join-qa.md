@@ -24,7 +24,7 @@ In **Authentication → Emails → Templates**, update BOTH **Confirm sign up** 
 Use `{{ .RedirectTo }}`, not a dynamic organization-name placeholder. This works for standard email sign-in and invitations; the app's invitation sender supplies the invitation-specific redirect URL. **Never remove `{{ .Token }}` from these templates**, since the app expects numeric email codes.
 
 In **Authentication → URL Configuration**, add the exact configured preview invitation redirect:
-`https://pubbblic-platform-qsvvuiuw2-qaloris-projects.vercel.app/invite/*`
+`https://pubbblic-platform-ks6y1kgqu-qaloris-projects.vercel.app/invite/*`
 
 When a permanent staging/app domain is approved, change the allowlist and `PUBBBLIC_APP_ORIGIN` Edge Function secret to that same HTTPS origin. The function has a temporary preview fallback. Avoid wildcard domains outside the authorized origin. **Do not add any separate Zoho API OAuth secrets.**
 
