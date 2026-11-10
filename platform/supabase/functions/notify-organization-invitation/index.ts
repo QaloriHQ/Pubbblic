@@ -16,7 +16,7 @@ const sendLimit = 5;
 const attemptLimit = 10;
 const cooldownMs = 120_000;
 // Temporary preview fallback. Replace with a stable, approved app origin at launch.
-const defaultPreviewOrigin = "https://pubbblic-platform-qsvvuiuw2-qaloris-projects.vercel.app";
+const defaultPreviewOrigin = "https://pubbblic-platform-ks6y1kgqu-qaloris-projects.vercel.app";
 const respond = (payload: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(payload), { status, headers });
 
