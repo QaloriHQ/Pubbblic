@@ -112,23 +112,34 @@ Deno.serve(async (request) => {
   if (claimError) return respond({ error: "delivery_reservation_failed" }, 503);
   if (!claimed) return respond({ error: "invitation_cooldown_or_changed" }, 429);
 
-  // Supabase Auth sends Confirm signup for new accounts and Magic link/OTP for
-  // existing accounts, using the already configured Zoho SMTP and email templates.
-  // The template should contain {{ .Token }} and a safe link to {{ .RedirectTo }}.
-  // The invite URL is a destination only; it never grants organization membership.
+  // New accounts: native Supabase Invite user template (admin-only).
+  // Existing accounts: Magic link or OTP template. Never reveal which branch
+  // ran to the caller; authorization is already restricted to an org admin.
+  // Both point to the same Pubbblic invitation acceptance page.
   let mailErrorCode: string | null = null;
+  let deliveryMethod: "supabase_auth_invite" | "supabase_auth_otp" = "supabase_auth_invite";
   try {
-    const mailer = createClient(url, publishable, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { error } = await mailer.auth.signInWithOtp({
-      email: invite.email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: invitationUrl,
-      },
-    });
-    if (error) mailErrorCode = "auth_email_request_" + String(error.status || "failed");
+    const { error: invitationError } = await admin.auth.admin.inviteUserByEmail(
+      invite.email, { redirectTo: invitationUrl }
+    );
+    if (invitationError) {
+      const code = String(invitationError.code || "");
+      const isExisting = code === "email_exists" || code === "user_already_exists" ||
+        /already registered|already exists/i.test(invitationError.message || "");
+      if (isExisting) {
+        deliveryMethod = "supabase_auth_otp";
+        const mailer = createClient(url, publishable, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { error } = await mailer.auth.signInWithOtp({
+          email: invite.email,
+          options: { shouldCreateUser: false, emailRedirectTo: invitationUrl },
+        });
+        if (error) mailErrorCode = "auth_email_request_" + String(error.status || "failed");
+      } else {
+        mailErrorCode = "auth_invitation_request_" + String(invitationError.status || "failed");
+      }
+    }
   } catch {
     mailErrorCode = "auth_email_request_failed";
   }
@@ -145,18 +156,18 @@ Deno.serve(async (request) => {
       notification_state: "sent",
       notification_sent_at: new Date().toISOString(),
       notification_send_count: invite.notification_send_count + 1,
-      notification_delivery_provider: "supabase_auth",
+      notification_delivery_provider: deliveryMethod,
       notification_provider_message_id: null,
       notification_last_error: null,
     })
     .eq("id", invite.id).eq("notification_attempt_count", attempt);
   if (trackingError) {
     console.error("Supabase Auth accepted invitation email but tracking update failed");
-    return respond({ email_request_accepted: true, method: "supabase_auth_otp", tracking_failed: true }, 202);
+    return respond({ email_request_accepted: true, method: "supabase_auth", tracking_failed: true }, 202);
   }
   return respond({
     email_request_accepted: true,
-    method: "supabase_auth_otp",
+    method: "supabase_auth",
     invitation_saved: true,
     // This confirms API acceptance, not delivery, verification or membership.
   }, 200);
