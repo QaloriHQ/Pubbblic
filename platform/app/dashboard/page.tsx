@@ -16,7 +16,8 @@ export default async function Dashboard({searchParams}:{searchParams:Promise<{or
   if(onboardingError||!onboarding||!onboarding.password_set_at) redirect("/onboarding");
   const {data:members,error:membersError}=await supabase.from("organization_memberships")
     .select("organization_id").eq("user_id",uid).limit(1);
-  if(membersError||!members?.length||!onboarding.invitations_reviewed_at) redirect("/onboarding");
+  // Team invitations are optional; only password setup and membership are gates.
+  if(membersError||!members?.length) redirect("/onboarding");
   const {organization="",start=""}=await searchParams;
   const initialOrgId=/^[0-9a-f-]{36}$/i.test(organization)?organization:"";
   return <CloudWorkspace userId={uid} userEmail={email} initialOrgId={initialOrgId}

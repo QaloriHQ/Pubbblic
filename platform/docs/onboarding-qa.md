@@ -6,10 +6,10 @@ Status: Supabase schema and Edge Functions deployed; Vercel preview built. Real-
 
 1. **Secure account.** Supabase Auth verifies email first; newly created users set a password (12–128 characters with uppercase, lowercase and a number) via the authenticated complete-onboarding-password Edge Function. Supabase Auth stores the password; public.user_onboarding stores only a completion timestamp.
 2. **Workspace.** Create an organization with create_organization or accept an existing invitation with accept_organization_invitation. Invitees should not create a duplicate organization.
-3. **Team and invitations.** Owners and admins can invite collaborators. Editors/Viewers review incoming invitations; inviting is optional. The authenticated complete-onboarding-team Edge Function marks the team step complete only after password setup and organization membership.
+3. **Team and invitations (optional).** Owners and admins may invite collaborators; everyone can skip this step. The Continue and Skip controls immediately advance to the release step and record a best-effort, user-scoped progress timestamp without any privileged Edge Function dependency. Owners/admins can invite later from Team & invitations.
 4. **First press release.** Owners/admins/editors open the private release editor; Viewers open a read-only workspace. Nothing publishes externally.
 
-The /dashboard page verifies password completion, organization membership, and team step completion; otherwise it redirects to /onboarding. The /invite/[id] page directs newly authenticated invitees to password setup before permitting membership acceptance. Existing pilot accounts were grandfathered to preserve ongoing QA work; only users created after migration are required to set up a password.
+The /dashboard page requires only password completion and organization membership. Team setup is optional, and a failed progress write cannot block access to the first release. The /invite/[id] page directs newly authenticated invitees to password setup before permitting membership acceptance. Existing pilot accounts were grandfathered to preserve ongoing QA work; only users created after migration are required to set up a password.
 
 The login page also offers "Sign in with password" once a password is set; email OTP continues for signup and recovery.
 
@@ -35,7 +35,7 @@ Do not paste provider credentials or passwords into GitHub, logs, or chat. Supab
 
 ## Verified and outstanding
 
-A rollback-only database test passed for new-account onboarding state initialization, RLS visibility, denial of team completion before password setup, denial before organization membership, and marking the team step after prerequisites. The test left no new users or organizations. After moving team completion behind a JWT-verified Edge Function, the security audit reports no privileged-Data-API RPC warning.
+A rollback-only database test passed for new-account onboarding state initialization, RLS visibility, denial of team completion before password setup, denial before organization membership, and marking the team step after prerequisites. The test left no new users or organizations. Team completion no longer depends on an Edge Function or a privileged RPC. A narrowly scoped authenticated RLS policy permits editing only the user's own optional invitations_reviewed_at field, never password state or another user's record.
 
 The Vercel preview build passed TypeScript checks and includes /onboarding and /invite/[id].
 
@@ -60,3 +60,7 @@ The Acme Agency QA invitation has not been automatically accepted or resent.
 - platform/supabase/functions/complete-onboarding-team/index.ts
 - platform/supabase/migrations/20261110120000_user_onboarding_sequence.sql
 - platform/supabase/migrations/20261110130000_onboarding_team_edge_permissions.sql
+
+## Nov 10 hotfix — team setup must never block
+
+A real onboarding attempt reached Step 03 and the complete-onboarding-team function returned HTTP 401. The required team-step gate has been removed from /dashboard. Both "Continue to first release" and "Skip team setup for now" advance immediately, and the optional progress timestamp is saved directly through an authenticated, column-restricted RLS policy. Inviting collaborators is still available during onboarding and later from Team & invitations. 

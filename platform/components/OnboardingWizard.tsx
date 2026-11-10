@@ -40,6 +40,7 @@ export function OnboardingWizard({
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [teamContinued,setTeamContinued]=useState(false);
 
   const refresh=useCallback(async(preferOrgId?:string)=>{
     const [profileResult,memberResult,invitationResult]=await Promise.all([
@@ -89,7 +90,7 @@ export function OnboardingWizard({
   const org=orgs.find(x=>x.id===activeOrgId);
   const canInvite=org?.role==="owner"||org?.role==="admin";
   const canWrite=!!org&&org.role!=="viewer";
-  const step=!profile?.password_set_at?1:orgs.length===0?2:!profile?.invitations_reviewed_at?3:4;
+  const step=!profile?.password_set_at?1:orgs.length===0?2:(!teamContinued&&!profile?.invitations_reviewed_at)?3:4;
   async function apply(run:()=>Promise<void>){
     setBusy(true);setError("");setNotice("");
     try{await run();}catch(err){setError(errorMessage(err));}finally{setBusy(false);}
@@ -154,12 +155,19 @@ export function OnboardingWizard({
     });
   }
   async function completeTeamStep(){
-    await apply(async()=>{
-      const {data,error:e}=await supabase.functions.invoke("complete-onboarding-team",{body:{}});
-      if(e||!data?.invitations_reviewed)throw new Error("Could not finish team setup. Try again or contact support.");
-      await refresh();
-      setNotice("Team step complete. Your release workspace is ready.");
-    });
+    // Invitations are genuinely optional: never require a network write or
+    // function authorization just to open the first release editor.
+    setTeamContinued(true);
+    setError("");
+    setNotice("You can invite collaborators any time from Team & invitations.");
+    const completedAt=new Date().toISOString();
+    const {error:e}=await supabase.from("user_onboarding")
+      .update({invitations_reviewed_at:completedAt})
+      .eq("user_id",userId);
+    if(!e){
+      setProfile(old=>old?{...old,invitations_reviewed_at:completedAt}:old);
+    }
+    // Best-effort progress metadata only; no blocking error if it fails.
   }
   async function logout(){
     await supabase.auth.signOut();
@@ -225,8 +233,8 @@ export function OnboardingWizard({
        </section>:
        step===3?<section className="pub-onboarding-panel">
         <span className="cloud-tag">STEP 03 · YOUR TEAM</span>
-        <h2>Review invitations and collaborators</h2>
-        <p>Workspace: <strong>{org?.name}</strong> · Your role: <strong>{org?.role}</strong></p>
+        <h2>Invite teammates (optional)</h2>
+        <p>Workspace: <strong>{org?.name}</strong> · Your role: <strong>{org?.role}</strong>. You can skip this step and invite collaborators later from Team & invitations.</p>
         {focusedInvites.length>0&&<div className="pub-onboarding-invites">
           <h3>Other invitations for your account</h3>
           {focusedInvites.map(inv=><div key={inv.invitation_id} className="pub-onboarding-invite">
@@ -245,7 +253,10 @@ export function OnboardingWizard({
           </select>
           <button className="cloud-button secondary pub-onboarding-action" disabled={busy} type="submit">Send invitation</button>
         </form>:<p className="pub-onboarding-note">As a {org?.role}, you can collaborate in the workspace. Team invitations are managed by organization owners and admins.</p>}
-        <button type="button" className="cloud-button pub-onboarding-action" disabled={busy} onClick={completeTeamStep}>Continue to first release <ArrowRightIcon width={17}/></button>
+        <div className="pub-onboarding-team-actions">
+          <button type="button" className="cloud-button pub-onboarding-action" onClick={completeTeamStep}>Continue to first release <ArrowRightIcon width={17}/></button>
+          <button type="button" className="pub-onboarding-skip" onClick={completeTeamStep}>Skip team setup for now</button>
+        </div>
        </section>:
        <section className="pub-onboarding-panel">
         <span className="cloud-tag">STEP 04 · FIRST PRESS RELEASE</span>
