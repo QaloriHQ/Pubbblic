@@ -155,8 +155,8 @@ export function OnboardingWizard({
   }
   async function completeTeamStep(){
     await apply(async()=>{
-      const {error:e}=await supabase.rpc("complete_onboarding_invitations");
-      if(e)throw e;
+      const {data,error:e}=await supabase.functions.invoke("complete-onboarding-team",{body:{}});
+      if(e||!data?.invitations_reviewed)throw new Error("Could not finish team setup. Try again or contact support.");
       await refresh();
       setNotice("Team step complete. Your release workspace is ready.");
     });
