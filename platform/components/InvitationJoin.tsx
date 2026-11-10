@@ -23,6 +23,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
   const [verifying,setVerifying]=useState(false);
   const [accepting,setAccepting]=useState(false);
   const [sent,setSent]=useState(false);
+  const [hasCode,setHasCode]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
 
@@ -71,7 +72,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
     setError("");setNotice("");
     const {error:e}=await supabase.auth.signOut();
     if(e){setError(e.message);return;}
-    setInvite(null);setSignedInEmail(null);setSent(false);setCode("");
+    setInvite(null);setSignedInEmail(null);setSent(false);setHasCode(false);setCode("");
     await loadInvitation();
   }
   async function accept(){
@@ -113,10 +114,11 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
        </>:<div className="invite-card">
           <h2>Verify your invited email</h2>
           <p>Whether you already have a Pubbblic account or you're joining for the first time, enter your invited email. Supabase will send a one-time verification code.</p>
-          {!sent?<form onSubmit={sendCode}>
+          {!sent && !hasCode?<form onSubmit={sendCode}>
             <label htmlFor="invite-email">Invited email address</label>
             <input id="invite-email" type="email" required maxLength={254} autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)}/>
             <button className="cloud-button invite-primary" type="submit" disabled={sending}>{sending?"Requesting code…":"Send verification code"}<ArrowRightIcon width={18}/></button>
+            <button type="button" className="invite-link-button" disabled={!email.trim()} onClick={()=>{setHasCode(true);setError("");setNotice("");}}>I already have an email code</button>
           </form>:<form onSubmit={verifyCode}>
             <label htmlFor="invite-readonly-email">Email</label><input id="invite-readonly-email" value={email} readOnly/>
             <label htmlFor="invite-code">Verification code</label>
@@ -124,7 +126,7 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
              onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,otpLength))}
              minLength={otpLength} maxLength={otpLength} pattern={"[0-9]{"+otpLength+"}"} placeholder={otpLength+"-digit code"}/>
             <button className="cloud-button invite-primary" type="submit" disabled={verifying||code.length!==otpLength}>{verifying?"Verifying…":"Verify and view invitation"}<ArrowRightIcon width={18}/></button>
-            <button className="invite-link-button" type="button" onClick={()=>{setSent(false);setCode("");setNotice("");setError("");}}>Use another email</button>
+            <button className="invite-link-button" type="button" onClick={()=>{setSent(false);setHasCode(false);setCode("");setNotice("");setError("");}}>Use another email</button>
           </form>}
           <p className="invite-fine"><LockClosedIcon width={15}/> Organization access is restricted to the invited, verified email.</p>
         </div>}
