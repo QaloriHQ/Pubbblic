@@ -1,4 +1,5 @@
-// Pubbblic organization invitations: Supabase Auth delivers OTP email via the configured SMTP.
+// Pubbblic organization invitations: Supabase Auth sends invitation or sign-in emails via custom SMTP.
+// Existing users receive Magic Link or OTP template; the hosted template must include {{ .ConfirmationURL }} for click-to-join.
 // Organization and role access remains in Pubbblic's RLS-protected invitations + accept RPC.
 // No separate Zoho Mail API, Resend API, or client-accessible service-role key required.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -15,8 +16,8 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const sendLimit = 5;
 const attemptLimit = 10;
 const cooldownMs = 120_000;
-// Temporary preview fallback. Replace with a stable, approved app origin at launch.
-const defaultPreviewOrigin = "https://pubbblic-platform-5nehj6it1-qaloris-projects.vercel.app";
+// Verified permanent Pubbblic app domain, not a short-lived Vercel preview URL.
+const canonicalAppOrigin = "https://app.pubbblic.com";
 const respond = (payload: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(payload), { status, headers });
 
@@ -30,12 +31,7 @@ function pickKey(variable: string, legacy: string): string | undefined {
   }
 }
 function appOrigin(): string {
-  const value = Deno.env.get("PUBBBLIC_APP_ORIGIN") || defaultPreviewOrigin;
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.username || url.password ||
-      url.pathname !== "/" || url.search || url.hash)
-    throw new Error("invalid_app_origin");
-  return url.origin;
+  return canonicalAppOrigin;
 }
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
@@ -118,7 +114,7 @@ Deno.serve(async (request) => {
   // ran to the caller; authorization is already restricted to an org admin.
   // Both point to the same Pubbblic invitation acceptance page.
   let mailErrorCode: string | null = null;
-  let deliveryMethod: "supabase_auth_invite" | "supabase_auth_otp" = "supabase_auth_invite";
+  let deliveryMethod: "supabase_auth_invite" | "supabase_auth_passwordless" = "supabase_auth_invite";
   try {
     const { error: invitationError } = await admin.auth.admin.inviteUserByEmail(
       invite.email, { redirectTo: invitationUrl }
@@ -128,7 +124,7 @@ Deno.serve(async (request) => {
       const isExisting = code === "email_exists" || code === "user_already_exists" ||
         /already registered|already exists/i.test(invitationError.message || "");
       if (isExisting) {
-        deliveryMethod = "supabase_auth_otp";
+        deliveryMethod = "supabase_auth_passwordless";
         const mailer = createClient(url, publishable, {
           auth: { persistSession: false, autoRefreshToken: false },
         });
