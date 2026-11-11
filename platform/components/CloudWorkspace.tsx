@@ -279,7 +279,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      const delivery=await sendInvitationEmail(String(invitationId));
      await loadPendingInvitations(orgId);
      setNotice(delivery.ok
-       ?"Invitation saved. Supabase accepted an OTP email request. The email contains a Join workspace link when the Auth email template includes it."
+       ?"Invitation saved. Supabase accepted an authentication email request. A clickable link requires {{ .ConfirmationURL }} in the matching Supabase Auth template."
        :delivery.reason||"Invitation saved, but an email was not sent.");
      setInviteEmail("");
    }catch(e){setError(short(e));}
@@ -288,7 +288,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
  async function copyInvitationLink(invitationId:string){
    setError("");setNotice("");
    try{
-     await navigator.clipboard.writeText(window.location.origin+"/invite/"+invitationId);
+     await navigator.clipboard.writeText("https://app.pubbblic.com/invite/"+invitationId);
      setNotice("Invite link copied. Share it with the intended recipient. They must verify the invited email address and explicitly accept.");
    }catch{
      setError("Could not copy the link. Your browser may require Clipboard permission or HTTPS.");
@@ -302,7 +302,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      const delivery=await sendInvitationEmail(invitationId);
      await loadPendingInvitations(orgId);
      setNotice(delivery.ok
-       ?"Supabase accepted the verification email request. Recipient must verify the invited address and accept membership."
+       ?"Supabase accepted the sign-in email request. Recipient must authenticate the invited address and accept membership."
        :delivery.reason||"The invitation remains saved; email could not be sent.");
    }catch(e){setError(short(e));}
    finally{setBusy(false);}
@@ -595,7 +595,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                     {(["owner","admin","editor","viewer"] as const).filter(r=>org?.role==="owner"||r!=="owner").map(r=><option value={r} key={r}>{r}</option>)}
                    </select><button className="cloud-button secondary" disabled={busy} type="button" onClick={()=>void removeMember(m.user_id)}>Remove</button></>:
                   <b>{m.role}</b>}</div></div>)}</section>
-               <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Invite a new or existing user. Supabase Auth sends the verification code through the configured Zoho SMTP; Pubbblic stores the role and grants access only after acceptance.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">{busy?"Processing…":"Create invitation & send email"} <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
+               <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Invite a new or existing user. Supabase Auth sends a sign-in or invitation email through the configured SMTP; Pubbblic grants organization access only after acceptance.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">{busy?"Processing…":"Create invitation & send email"} <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
              </div>
              {canInvite&&<section className="cloud-panel cloud-pending-invitations">
                <div className="cloud-panel-head"><div><h2>Pending invitations</h2><p>Invitation records are saved in Supabase; an email request is a separate step.</p></div><span>{pendingInvitations.length} pending</span></div>
@@ -607,7 +607,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                    return <div className="cloud-pending-row" key={inv.id}>
                      <div className="cloud-pending-person"><strong>{inv.email}</strong><span>{inv.role} · expires {fmtDate(inv.expires_at)}</span></div>
                      <div className="cloud-pending-state">
-                       <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?(inv.notification_delivery_provider==="supabase_auth"?"OTP requested":"Previous email requested"):inv.notification_state==="failed"?"Delivery failed":inv.notification_state==="sending"?"Sending…":"Not sent"}</span>
+                       <span className={"cloud-pending-status "+(inv.notification_state==="sent"?"sent":"")}>{inv.notification_state==="sent"?(inv.notification_delivery_provider==="supabase_auth_passwordless"?"Sign-in email requested":"Invitation email requested"):inv.notification_state==="failed"?"Delivery failed":inv.notification_state==="sending"?"Sending…":"Not sent"}</span>
                        {inv.notification_sent_at&&<small>Auth request accepted {fmtDate(inv.notification_sent_at)}</small>}
                        {inv.notification_last_error&&<small>Last attempt: {inv.notification_last_error.replaceAll("_"," ")}</small>}
                      </div>
@@ -620,7 +620,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                      </div>
                    </div>;
                  })}
-               <p className="cloud-pending-footnote">Supabase Auth sends a code through your existing Zoho SMTP. If the email template includes a Join workspace link, recipients can open the invite directly; otherwise use Copy join link. Only the matching verified account can accept a role.</p>
+               <p className="cloud-pending-footnote">Supabase Auth uses your existing Zoho SMTP. For existing users, the Magic link or OTP template must contain {{ .ConfirmationURL }}. New users receive the Invite user template. Recipients must sign in and explicitly accept membership.</p>
              </section>}
              {canInvite&&<section className="cloud-panel studio-access-audit"><h2>Access audit</h2>
                <p>Role changes, removals and invitation revocations are recorded. Only owners and admins may view this log.</p>

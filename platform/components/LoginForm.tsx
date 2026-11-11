@@ -34,7 +34,7 @@ export function LoginForm() {
       });
       if(error) throw error;
       setPhase("code");
-      setNotice("Check your inbox for your verification code. Enter all digits from the email, or follow the sign-in link if one was sent.");
+      setNotice("Check your inbox and open the secure sign-in link. If the message contains a code instead, enter it below.");
     }catch(err){setFailure(err instanceof Error?err.message:"Could not send a sign-in email.");}
     finally{setBusy(false);}
   }

@@ -56,11 +56,11 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
     try{
       const {error:e}=await supabase.auth.signInWithOtp({
         email:email.trim().toLowerCase(),
-        options:{shouldCreateUser:true,emailRedirectTo:window.location.origin+"/invite/"+invitationId}
+        options:{shouldCreateUser:false,emailRedirectTo:"https://app.pubbblic.com/invite/"+invitationId}
       });
       if(e)throw e;
-      setSent(true);
-      setNotice("Verification email requested. Enter the complete code to view and accept your invitation.");
+      setSent(true);setHasCode(false);
+      setNotice("Sign-in email requested. Open its secure link to return to the invitation; if the email contains a code instead, choose the code option below.");
     }catch(e){setError(e instanceof Error?e.message:"Could not request a sign-in code.");}
     finally{setSending(false);}
   }
@@ -119,13 +119,17 @@ export function InvitationJoin({ invitationId }: { invitationId: string }) {
         </div>}
        </>:<div className="invite-card">
           <h2>Verify your invited email</h2>
-          <p>Whether you already have a Pubbblic account or you're joining for the first time, enter your invited email. Supabase will send a one-time verification code.</p>
+          <p>Follow the secure sign-in or invitation link in your email. If you need another sign-in email, enter the invited address below.</p>
           {!sent && !hasCode?<form onSubmit={sendCode}>
             <label htmlFor="invite-email">Invited email address</label>
             <input id="invite-email" type="email" required maxLength={254} autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)}/>
-            <button className="cloud-button invite-primary" type="submit" disabled={sending}>{sending?"Requesting code…":"Send verification code"}<ArrowRightIcon width={18}/></button>
-            <button type="button" className="invite-link-button" disabled={!email.trim()} onClick={()=>{setHasCode(true);setError("");setNotice("");}}>I already have an email code</button>
-          </form>:<form onSubmit={verifyCode}>
+            <button className="cloud-button invite-primary" type="submit" disabled={sending}>{sending?"Sending…":"Send sign-in link"}<ArrowRightIcon width={18}/></button>
+            <button type="button" className="invite-link-button" disabled={!email.trim()} onClick={()=>{setHasCode(true);setError("");setNotice("");}}>I received a verification code instead</button>
+          </form>:sent&&!hasCode?<div className="invite-link-check">
+            <p><strong>Check your email.</strong> Open the secure Pubbblic link to continue with this invitation.</p>
+            <button type="button" className="invite-link-button" onClick={()=>setHasCode(true)}>I received a code instead</button>
+            <button type="button" className="invite-link-button" onClick={()=>{setSent(false);setHasCode(false);setCode("");setNotice("");}}>Use another email</button>
+          </div>:<form onSubmit={verifyCode}>
             <label htmlFor="invite-readonly-email">Email</label><input id="invite-readonly-email" value={email} readOnly/>
             <label htmlFor="invite-code">Verification code</label>
             <input id="invite-code" type="text" required inputMode="numeric" autoComplete="one-time-code" value={code}
