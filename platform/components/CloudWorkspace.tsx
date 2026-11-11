@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/browser";
 import { wordCount } from "@/lib/release";
 import { ReleaseBodyEditor, renderReleaseBody } from "@/components/ReleaseBodyEditor";
+import {EditorialWorkspace} from "@/components/EditorialWorkspace";
 
 type Role = "owner" | "admin" | "editor" | "viewer";
 type Org = { id:string; name:string; role:Role };
@@ -35,7 +36,7 @@ type Release = ReleaseForm & {
 type Asset = {id:string;object_path:string;file_name:string;mime_type:string;byte_size:number};
 type ReleaseRevision = {version:number;created_at:string;actor_id:string|null;snapshot:Release};
 type SaveStatus = "idle"|"dirty"|"saving"|"saved"|"conflict"|"error";
-type Tab = "home"|"releases"|"editor"|"team"|"settings";
+type Tab = "home"|"releases"|"editor"|"review"|"team"|"settings";
 const blank:ReleaseForm={headline:"",summary:"",issuer:"",dateline:"",category:"Company news",body:"",body_format:"markdown",quote_text:"",quote_attribution:"",boilerplate:"",contact_name:"",contact_email:""};
 const categories=["Company news","Product launch","Partnership","Milestone","Event","Other"];
 function fmtDate(raw:string){return new Date(raw).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric"});}
@@ -45,7 +46,7 @@ function Field({title,required=false,children,hint}:{title:string;required?:bool
  return <label className="cloud-field"><span>{title}{required&&<b> *</b>}</span>{children}{hint&&<small>{hint}</small>}</label>;
 }
 export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="home"}:{
- userId:string;userEmail:string;initialOrgId?:string;initialTab?:"home"|"releases"|"editor"|"team"|"settings"
+ userId:string;userEmail:string;initialOrgId?:string;initialTab?:"home"|"releases"|"editor"|"review"|"team"|"settings"
 }){
  const supabase=useMemo(()=>createClient(),[]);
  const router=useRouter();
@@ -197,6 +198,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    switchTab("editor");
  }
  function editRelease(release:Release){
+   if(!["draft","changes_requested"].includes(release.status)){switchTab("review");return;}
    if(saveStatus==="dirty"&&!window.confirm("Discard unsaved edits and open this release?"))return;
    editorSessionRef.current++;
    const fields=Object.keys(blank) as (keyof ReleaseForm)[];
@@ -313,7 +315,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
        const {data,error:e}=await supabase.from("press_releases")
          .update({...snapshot,version:savedVersion+1})
          .eq("id",savedId).eq("organization_id",orgId).eq("version",savedVersion)
-         .eq("status","draft").select("*").maybeSingle();
+         .in("status",["draft","changes_requested"]).select("*").maybeSingle();
        if(e)throw e;
        if(!data)throw new Error("VERSION_CONFLICT: Another session saved a newer revision. Copy your edits, then reopen the release before saving.");
        saved=data as Release;
@@ -358,7 +360,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      }
      const {data,error:e}=await supabase.from("press_releases")
        .update({...snapshot,version:editingVersion+1})
-       .eq("id",editingId).eq("organization_id",orgId).eq("status","draft")
+       .eq("id",editingId).eq("organization_id",orgId).in("status",["draft","changes_requested"])
        .eq("version",editingVersion).select("*").maybeSingle();
      if(e)throw e;
      if(!data)throw new Error("Restore conflict: a newer revision exists. Refresh before restoring.");
@@ -368,6 +370,13 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      await Promise.all([loadReleases(orgId),loadHistory(editingId)]);
    }catch(e){setError(short(e));}
    finally{savingRef.current=false;setBusy(false);}
+ }
+ async function openReviewDraft(id:string){
+   const {data,error:e}=await supabase.from("press_releases").select("*")
+     .eq("organization_id",orgId).eq("id",id).maybeSingle();
+   if(e||!data){setError(e?.message||"Draft unavailable.");return;}
+   await loadReleases(orgId);
+   editRelease(data as Release);
  }
  async function archiveRelease(release:Release){
    if(!canWrite||!window.confirm("Archive this draft? It will be hidden from the active list."))return;
@@ -423,7 +432,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      <div className="cloud-sidebar-head"><Logo/><button className="cloud-close" onClick={()=>setMobileOpen(false)} aria-label="Close menu"><XMarkIcon width={22}/></button></div>
      <div className="cloud-org-picker"><div className="cloud-small-label">CURRENT ORGANIZATION</div>{orgs.length?orgSwitcher:<span>Set up a workspace</span>}</div>
      <nav className="cloud-nav" aria-label="Workspace navigation">
-       {([{key:"home",label:"Overview",icon:BuildingOfficeIcon},{key:"releases",label:"Press releases",icon:DocumentTextIcon},{key:"editor",label:"Release editor",icon:PlusIcon},{key:"team",label:"Team & invitations",icon:UsersIcon},{key:"settings",label:"Account settings",icon:ShieldCheckIcon}] as const).map(item=>
+       {([{key:"home",label:"Overview",icon:BuildingOfficeIcon},{key:"releases",label:"Press releases",icon:DocumentTextIcon},{key:"editor",label:"Release editor",icon:PlusIcon},{key:"review",label:"Editorial reviews",icon:ShieldCheckIcon},{key:"team",label:"Team & invitations",icon:UsersIcon},{key:"settings",label:"Account settings",icon:ShieldCheckIcon}] as const).map(item=>
          <button key={item.key} type="button" className={tab===item.key?"active":""}
            onClick={()=>{if(item.key==="editor")newRelease();else switchTab(item.key);}}><item.icon width={19}/>{item.label}</button>
        )}
@@ -451,8 +460,8 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
              {invitations.length>0&&<section className="cloud-panel cloud-invite-banner"><h2>Organization invitations</h2>{invitations.map(i=><div key={i.invitation_id}><strong>{i.organization_name}</strong> · {i.invited_role}<button onClick={()=>acceptInvitation(i.invitation_id)} disabled={busy}>Accept invitation</button></div>)}</section>}
            </>}
            {tab==="releases"&&<><div className="cloud-heading"><div><span className="cloud-tag">RELEASE LIBRARY</span><h1>Press releases</h1><p>Draft content is stored in Supabase with organization-based access controls and revision history.</p></div>{canWrite&&<button className="cloud-button" onClick={newRelease}><PlusIcon width={18}/> New release</button>}</div>
-             <section className="cloud-panel cloud-list"><div className="cloud-panel-head"><h2>{releases.length} active draft{releases.length===1?"":"s"}</h2><span>Organization: {org?.name}</span></div>
-               {!releases.length?<div className="cloud-empty"><DocumentTextIcon width={28}/><p>No releases yet.</p></div>:releases.map(r=><div className="cloud-release-item" key={r.id}><DocumentTextIcon width={22}/><div><strong>{r.headline||"Untitled draft"}</strong><small>{r.category} · Version {r.version} · {fmtDate(r.updated_at)}</small></div><button onClick={()=>editRelease(r)}>Open</button>{canWrite&&<button className="cloud-archive" onClick={()=>archiveRelease(r)} disabled={busy}>Archive</button>}</div>)}
+             <section className="cloud-panel cloud-list"><div className="cloud-panel-head"><h2>{releases.length} active release{releases.length===1?"":"s"}</h2><span>Organization: {org?.name}</span></div>
+               {!releases.length?<div className="cloud-empty"><DocumentTextIcon width={28}/><p>No releases yet.</p></div>:releases.map(r=><div className="cloud-release-item" key={r.id}><DocumentTextIcon width={22}/><div><strong>{r.headline||"Untitled draft"}</strong><small>{r.category} · {r.status.replaceAll("_"," ")} · Version {r.version} · {fmtDate(r.updated_at)}</small></div><button onClick={()=>editRelease(r)}>{["draft","changes_requested"].includes(r.status)?"Edit":"Review"}</button>{canWrite&&r.status==="draft"&&<button className="cloud-archive" onClick={()=>archiveRelease(r)} disabled={busy}>Archive</button>}</div>)}
              </section></>}
            {tab==="editor"&&<><div className="cloud-heading cloud-editor-heading"><div><button className="cloud-back" onClick={()=>switchTab("releases")}><ArrowLeftIcon width={16}/> Back to releases</button><span className="cloud-tag">RELEASE EDITOR</span><h1>{editingId?"Edit press release":"Create a press release"}</h1><p>Autosave keeps your draft private. Every successful save preserves an immutable revision.</p><div className="studio-save-indicator" role="status" aria-live="polite">{saveStatus==="saving"?"Saving…":saveStatus==="dirty"?"Unsaved edits — autosave pending":saveStatus==="saved"?"All changes saved":saveStatus==="conflict"?"Conflict — reopen before saving":saveStatus==="error"?"Save failed — retry":"New unsaved draft"}{lastSavedAt&&<small> · {new Date(lastSavedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</small>}</div></div>{canWrite&&<button className="cloud-button" onClick={()=>saveRelease()} disabled={busy||saveStatus==="saving"}>{busy||saveStatus==="saving"?"Saving…":"Save now"} <ArrowRightIcon width={17}/></button>}</div>
              {!canWrite?<div className="cloud-panel cloud-empty"><LockClosedIcon width={27}/><p>This organization role is read-only.</p></div>:<div className="cloud-editor-layout"><form className="cloud-panel cloud-editor cloud-editor-wide" onSubmit={saveRelease}>
@@ -523,6 +532,8 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
              </aside>
            </div>}
            </>}
+           {tab==="review"&&org&&<EditorialWorkspace key={org.id} organizationId={org.id}
+              role={org.role} userId={userId} onOpenDraft={openReviewDraft}/>}
            {tab==="team"&&<><div className="cloud-heading"><div><span className="cloud-tag">ORGANIZATION ACCESS</span><h1>People and permissions</h1><p>Manage accepted members and pending invitations separately.</p></div></div>
              <div className="cloud-two-col"><section className="cloud-panel cloud-team"><h2>Organization members</h2><p>Your role: <strong>{org?.role}</strong></p>{members.map(m=><div className="cloud-member" key={m.user_id}><span><UsersIcon width={18}/>{m.user_id===userId?userEmail||"You":m.user_id.slice(0,8)+"…"}</span><b>{m.role}</b></div>)}</section>
                <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Invite a new or existing user. Supabase Auth sends the verification code through the configured Zoho SMTP; Pubbblic stores the role and grants access only after acceptance.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">{busy?"Processing…":"Create invitation & send email"} <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
