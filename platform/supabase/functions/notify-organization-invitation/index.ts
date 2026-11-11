@@ -67,7 +67,7 @@ Deno.serve(async (request) => {
   // Both invitation RLS and organization membership must authorize this request.
   const { data: invite, error: lookupError } = await requester
     .from("organization_invitations")
-    .select("id,organization_id,email,role,accepted_at,expires_at,notification_last_attempt_at,notification_send_count,notification_attempt_count")
+    .select("id,organization_id,email,role,accepted_at,cancelled_at,expires_at,notification_last_attempt_at,notification_send_count,notification_attempt_count")
     .eq("id", invitationId).maybeSingle();
   if (lookupError) return respond({ error: "invitation_lookup_failed" }, 500);
   if (!invite) return respond({ error: "invitation_not_found_or_forbidden" }, 403);
@@ -77,7 +77,7 @@ Deno.serve(async (request) => {
   if (membershipError || !["owner", "admin"].includes(membership?.role || ""))
     return respond({ error: "permission_denied" }, 403);
   const now = new Date();
-  if (invite.accepted_at || new Date(invite.expires_at).getTime() <= now.getTime())
+  if (invite.accepted_at || invite.cancelled_at || new Date(invite.expires_at).getTime() <= now.getTime())
     return respond({ error: "invitation_not_active" }, 409);
   if (invite.notification_send_count >= sendLimit || invite.notification_attempt_count >= attemptLimit)
     return respond({ error: "invitation_send_limit" }, 429);
@@ -106,6 +106,7 @@ Deno.serve(async (request) => {
     .eq("notification_attempt_count", invite.notification_attempt_count)
     .eq("notification_send_count", invite.notification_send_count)
     .is("accepted_at", null)
+    .is("cancelled_at", null)
     .gt("expires_at", now.toISOString())
     .or("notification_last_attempt_at.is.null,notification_last_attempt_at.lt." + cutoff)
     .select("id").maybeSingle();
