@@ -168,6 +168,12 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    }else{setAssets([]);setHistory([]);}
  },[editingId,loadAssets,loadHistory]);
  useEffect(()=>{
+   if(saveStatus!=="dirty")return;
+   const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue="";};
+   window.addEventListener("beforeunload",warn);
+   return ()=>window.removeEventListener("beforeunload",warn);
+ },[saveStatus]);
+ useEffect(()=>{
    if(saveStatus!=="dirty"||tab!=="editor"||!canWrite||busy)return;
    if(!form.headline.trim()&&!form.body.trim())return;
    const timer=window.setTimeout(()=>{void saveRelease(undefined,true);},2700);
@@ -177,7 +183,11 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
  },[changeCount,saveStatus,tab,canWrite,busy,editingVersion,editingId]);
 
  function switchTab(next:Tab){
-   if(tab==="editor"&&next!=="editor"&&saveStatus==="dirty"&&!window.confirm("This draft has unsaved edits. Leave without saving?"))return;
+   if(tab==="editor"&&next!=="editor"){
+     if(saveStatus==="dirty"&&!window.confirm("This draft has unsaved edits. Leave without saving?"))return;
+     editorSessionRef.current++;
+     setSaveStatus("idle");setEditingId(null);setSelectedRevision(null);
+   }
    setTab(next);setNotice("");setError("");setMobileOpen(false);window.scrollTo({top:0,behavior:"smooth"});
  }
  function newRelease(){
@@ -403,7 +413,8 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
  }
  const orgSwitcher=<select aria-label="Selected organization" value={orgId} onChange={e=>{
    if(tab==="editor"&&saveStatus==="dirty"&&!window.confirm("Unsaved edits will be lost when switching organizations. Continue?"))return;
-   editorSessionRef.current++;setOrgId(e.target.value);setSaveStatus("idle");setEditingId(null);switchTab("home");
+   editorSessionRef.current++;setOrgId(e.target.value);setSaveStatus("idle");setEditingId(null);setSelectedRevision(null);
+   setTab("home");setError("");setNotice("");setMobileOpen(false);
  }}>
    {orgs.map(o=><option value={o.id} key={o.id}>{o.name}</option>)}
  </select>;
