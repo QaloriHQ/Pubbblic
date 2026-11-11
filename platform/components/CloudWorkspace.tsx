@@ -24,6 +24,7 @@ type PendingInvitation = {
  notification_delivery_provider:string|null; notification_last_error:string|null;
 };
 type Membership = {user_id:string;role:Role;created_at:string};
+type AccessEvent={id:string;event_type:string;before_role:string|null;after_role:string|null;created_at:string;actor_id:string|null};
 type ReleaseForm = {
  headline:string; summary:string; issuer:string; dateline:string;
  category:string; body:string; body_format:"plain"|"markdown"; quote_text:string; quote_attribution:string;
@@ -56,6 +57,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
  const [pendingInvitations,setPendingInvitations]=useState<PendingInvitation[]>([]);
  const [releases,setReleases]=useState<Release[]>([]);
  const [members,setMembers]=useState<Membership[]>([]);
+ const [accessEvents,setAccessEvents]=useState<AccessEvent[]>([]);
  const [assets,setAssets]=useState<Asset[]>([]);
  const [tab,setTab]=useState<Tab>(initialTab);
  const [form,setForm]=useState<ReleaseForm>({...blank});
@@ -127,10 +129,17 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    if(e)throw e;
    setMembers((data||[]) as Membership[]);
  },[supabase]);
+ const loadAccessEvents=useCallback(async(id:string)=>{
+   const {data,error:e}=await supabase.from("organization_access_events")
+    .select("id,event_type,before_role,after_role,created_at,actor_id")
+    .eq("organization_id",id).order("created_at",{ascending:false}).limit(30);
+   if(e)throw e;
+   setAccessEvents((data||[]) as AccessEvent[]);
+ },[supabase]);
  const loadPendingInvitations=useCallback(async(id:string)=>{
    const {data,error:e}=await supabase.from("organization_invitations")
      .select("id,email,role,invited_at,expires_at,accepted_at,notification_state,notification_sent_at,notification_last_attempt_at,notification_send_count,notification_attempt_count,notification_delivery_provider,notification_last_error")
-     .eq("organization_id",id).is("accepted_at",null)
+     .eq("organization_id",id).is("accepted_at",null).is("cancelled_at",null)
      .order("invited_at",{ascending:false});
    if(e)throw e;
    setPendingInvitations((data||[]) as PendingInvitation[]);
@@ -161,7 +170,8 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    loadReleases(orgId).catch(e=>setError("Could not load releases: "+short(e)));
    loadMembers(orgId).catch(e=>setError("Could not load team members: "+short(e)));
    loadPendingInvitations(orgId).catch(e=>setError("Could not load pending invitations: "+short(e)));
- },[orgId,loadReleases,loadMembers,loadPendingInvitations]);
+   if(canInvite)loadAccessEvents(orgId).catch(e=>setError("Could not load access audit: "+short(e)));
+ },[orgId,loadReleases,loadMembers,loadPendingInvitations,loadAccessEvents,canInvite]);
  useEffect(()=>{
    if(editingId){
      loadAssets(editingId).catch(e=>setError("Could not load attachments: "+short(e)));
@@ -378,6 +388,49 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    await loadReleases(orgId);
    editRelease(data as Release);
  }
+ async function changeMemberRole(memberId:string,next:Role){
+   if(!orgId||!canInvite||busy||!window.confirm("Change this member's role to "+next+"?"))return;
+   setBusy(true);setError("");setNotice("");
+   try{
+     const {data,error:e}=await supabase.from("organization_memberships")
+      .update({role:next}).eq("organization_id",orgId).eq("user_id",memberId).select("user_id").maybeSingle();
+     if(e)throw e;if(!data)throw new Error("Permission denied or membership not found.");
+     await Promise.all([loadMembers(orgId),loadAccessEvents(orgId)]);
+     if(memberId===userId)await loadOrgs();
+     setNotice("Role change saved with a security audit record.");
+   }catch(e){setError(short(e));}finally{setBusy(false);}
+ }
+ async function removeMember(memberId:string){
+   if(!orgId||!canInvite||busy||!window.confirm("Remove this person from the organization? Their access will be revoked."))return;
+   setBusy(true);setError("");setNotice("");
+   try{
+     const {data,error:e}=await supabase.from("organization_memberships")
+      .delete().eq("organization_id",orgId).eq("user_id",memberId).select("user_id").maybeSingle();
+     if(e)throw e;if(!data)throw new Error("Permission denied or membership not found.");
+     await Promise.all([loadMembers(orgId),loadAccessEvents(orgId)]);
+     if(memberId===userId)await loadOrgs();
+     setNotice("Member removed and recorded in the security audit.");
+   }catch(e){setError(short(e));}finally{setBusy(false);}
+ }
+ async function cancelInvitation(invitationId:string){
+   if(!orgId||!canInvite||busy||!window.confirm("Revoke this invitation? The recipient will no longer be able to join."))return;
+   setBusy(true);setError("");setNotice("");
+   try{
+     const {data,error:e}=await supabase.from("organization_invitations")
+      .update({cancelled_at:new Date().toISOString()})
+      .eq("organization_id",orgId).eq("id",invitationId).is("accepted_at",null)
+      .select("id").maybeSingle();
+     if(e)throw e;if(!data)throw new Error("Invitation unavailable or already accepted.");
+     await Promise.all([loadPendingInvitations(orgId),loadAccessEvents(orgId)]);
+     setNotice("Invitation revoked; future email sends and acceptance are blocked.");
+   }catch(e){setError(short(e));}finally{setBusy(false);}
+ }
+ async function signOutEverywhere(){
+   setBusy(true);setError("");
+   const {error:e}=await supabase.auth.signOut({scope:"global"});
+   if(e){setError(e.message);setBusy(false);return;}
+   router.replace("/login");router.refresh();
+ }
  async function archiveRelease(release:Release){
    if(!canWrite||!window.confirm("Archive this draft? It will be hidden from the active list."))return;
    setBusy(true);setError("");setNotice("");
@@ -535,7 +588,13 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
            {tab==="review"&&org&&<EditorialWorkspace key={org.id} organizationId={org.id}
               role={org.role} userId={userId} onOpenDraft={openReviewDraft}/>}
            {tab==="team"&&<><div className="cloud-heading"><div><span className="cloud-tag">ORGANIZATION ACCESS</span><h1>People and permissions</h1><p>Manage accepted members and pending invitations separately.</p></div></div>
-             <div className="cloud-two-col"><section className="cloud-panel cloud-team"><h2>Organization members</h2><p>Your role: <strong>{org?.role}</strong></p>{members.map(m=><div className="cloud-member" key={m.user_id}><span><UsersIcon width={18}/>{m.user_id===userId?userEmail||"You":m.user_id.slice(0,8)+"…"}</span><b>{m.role}</b></div>)}</section>
+             <div className="cloud-two-col"><section className="cloud-panel cloud-team"><h2>Organization members</h2><p>Your role: <strong>{org?.role}</strong></p>{members.map(m=><div className="cloud-member" key={m.user_id}><span><UsersIcon width={18}/>{m.user_id===userId?userEmail||"You":m.user_id.slice(0,8)+"…"}</span>
+                <div className="studio-member-actions">{canInvite?
+                  <><select aria-label={"Member role "+m.user_id.slice(0,8)} value={m.role} disabled={busy}
+                     onChange={e=>void changeMemberRole(m.user_id,e.target.value as Role)}>
+                    {(["owner","admin","editor","viewer"] as const).filter(r=>org?.role==="owner"||r!=="owner").map(r=><option value={r} key={r}>{r}</option>)}
+                   </select><button className="cloud-button secondary" disabled={busy} type="button" onClick={()=>void removeMember(m.user_id)}>Remove</button></>:
+                  <b>{m.role}</b>}</div></div>)}</section>
                <section className="cloud-panel cloud-team"><h2>Invite a collaborator</h2><p>Invite a new or existing user. Supabase Auth sends the verification code through the configured Zoho SMTP; Pubbblic stores the role and grants access only after acceptance.</p>{canInvite?<form onSubmit={inviteMember}><Field title="Email address" required><input required type="email" maxLength={254} value={inviteEmail} placeholder="teammate@company.com" onChange={e=>setInviteEmail(e.target.value)}/></Field><Field title="Role"><select value={inviteRole} onChange={e=>setInviteRole(e.target.value as typeof inviteRole)}><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select></Field><button className="cloud-button" disabled={busy} type="submit">{busy?"Processing…":"Create invitation & send email"} <ArrowRightIcon width={16}/></button></form>:<p>Only organization owners and admins can invite members.</p>}</section>
              </div>
              {canInvite&&<section className="cloud-panel cloud-pending-invitations">
@@ -557,14 +616,21 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                        <button className="cloud-button secondary" type="button" disabled={busy||recentlyAttempted||expired||limitReached} onClick={()=>resendInvitation(inv.id)}>
                          {expired?"Expired":limitReached?"Send limit reached":recentlyAttempted?"Try again later":inv.notification_sent_at?"Resend verification":"Send verification"}
                        </button>
+                       <button className="cloud-button secondary" type="button" disabled={busy} onClick={()=>void cancelInvitation(inv.id)}>Revoke invitation</button>
                      </div>
                    </div>;
                  })}
                <p className="cloud-pending-footnote">Supabase Auth sends a code through your existing Zoho SMTP. If the email template includes a Join workspace link, recipients can open the invite directly; otherwise use Copy join link. Only the matching verified account can accept a role.</p>
              </section>}
+             {canInvite&&<section className="cloud-panel studio-access-audit"><h2>Access audit</h2>
+               <p>Role changes, removals and invitation revocations are recorded. Only owners and admins may view this log.</p>
+               {accessEvents.length===0?<p>No access changes recorded.</p>:accessEvents.map(entry=>
+               <div className="studio-access-event" key={entry.id}><strong>{entry.event_type.replaceAll("_"," ")}</strong>
+               <span>{entry.before_role||"—"} → {entry.after_role||"—"}</span><small>{fmtDate(entry.created_at)}</small></div>)}
+             </section>}
            </>}
            {tab==="settings"&&<><div className="cloud-heading"><div><span className="cloud-tag">ACCOUNT & SECURITY</span><h1>Workspace settings</h1><p>Access and storage controls for your organization.</p></div></div>
-             <section className="cloud-panel cloud-team"><h2>Your account</h2><p><strong>Authenticated email:</strong> {userEmail}</p><p><strong>Active organization:</strong> {org?.name}</p><p><strong>Access role:</strong> {org?.role}</p><p><strong>Release storage:</strong> Supabase PostgreSQL with RLS and immutable version snapshots</p><p><strong>Media:</strong> private bucket, scoped storage policies, temporary signed links</p><p><strong>Live publisher distribution:</strong> disabled pending security and permissions review</p><button className="cloud-button secondary" onClick={signOut} disabled={busy}>Sign out</button></section>
+             <section className="cloud-panel cloud-team"><h2>Your account</h2><p><strong>Authenticated email:</strong> {userEmail}</p><p><strong>Active organization:</strong> {org?.name}</p><p><strong>Access role:</strong> {org?.role}</p><p><strong>Release storage:</strong> Supabase PostgreSQL with RLS and immutable version snapshots</p><p><strong>Media:</strong> private bucket, scoped storage policies, temporary signed links</p><p><strong>Live publisher distribution:</strong> disabled pending security and permissions review</p><div className="studio-security-actions"><button className="cloud-button secondary" onClick={signOut} disabled={busy}>Sign out</button><button className="cloud-button secondary" onClick={signOutEverywhere} disabled={busy}>Sign out of all sessions</button></div><p>Global sign-out revokes refresh tokens. Previously issued access tokens can remain valid until they expire.</p></section>
            </>}
          </>}
        </>}
