@@ -445,21 +445,21 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    finally{setBusy(false);}
  }
  async function uploadAsset(file:File){
-   if(!editingId||!orgId||!canWrite)return;
-   const allowed:Record<string,string>={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf"};
-   if(!allowed[file.type]||file.size>10485760||file.size===0){setError("Only JPEG, PNG, WEBP or PDF files up to 10 MB are permitted.");return;}
-   const path=orgId+"/"+editingId+"/"+crypto.randomUUID()+"."+allowed[file.type];
+   if(!editingId||!orgId||!canWrite||uploading)return;
+   if(file.size<1||file.size>10485760){
+     setError("Select a valid JPEG, PNG, WEBP or PDF file up to 10 MB.");return;
+   }
    setUploading(true);setError("");setNotice("");
    try{
-     const {error:upError}=await supabase.storage.from("release-assets").upload(path,file,{upsert:false,contentType:file.type,cacheControl:"private"});
-     if(upError)throw upError;
-     const {error:e}=await supabase.from("press_release_media").insert({
-       organization_id:orgId,release_id:editingId,object_path:path,
-       file_name:file.name.slice(0,255),mime_type:file.type,byte_size:file.size,uploaded_by:userId
-     });
-     if(e)throw new Error("The file was uploaded but its metadata could not be saved. Contact support before retrying: "+e.message);
-     await loadAssets(editingId);setNotice("Attachment uploaded to private release storage.");
-   }catch(e){setError(short(e));}
+     const payload=new FormData();
+     payload.set("release_id",editingId);
+     payload.set("file",file,file.name);
+     const {data,error:e}=await supabase.functions.invoke("upload-release-media",{body:payload});
+     if(e||!data?.media_id)throw new Error(data?.error||
+       "Media upload could not be validated. Ensure the file is a supported image or safe PDF.");
+     await loadAssets(editingId);
+     setNotice("File added to private storage. Signature and basic PDF checks passed; this is not an antivirus scan.");
+   }catch(err){setError(short(err));}
    finally{setUploading(false);}
  }
  async function openAsset(asset:Asset){
@@ -567,7 +567,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                  </div>;
                })()}
              </section>}
-             {editingId&&<section className="cloud-panel cloud-assets cloud-assets-wide"><span className="cloud-tag">PRIVATE MEDIA STORAGE</span><h2>Supporting files</h2><p>Upload one PDF or image at a time, up to 10 MB. Files are private to authorized organization members.</p><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={e=>{const file=e.target.files?.[0];if(file)uploadAsset(file);e.currentTarget.value="";}}/><div className="cloud-assets-list">{assets.map(a=><button key={a.id} onClick={()=>openAsset(a)}><CloudArrowUpIcon width={17}/>{a.file_name}<span>{Math.round(a.byte_size/1024)} KB</span></button>)}</div>{uploading&&<small>Uploading…</small>}</section>}
+             {editingId&&<section className="cloud-panel cloud-assets cloud-assets-wide"><span className="cloud-tag">PRIVATE MEDIA STORAGE</span><h2>Supporting files</h2><p>Upload JPEG, PNG, WEBP or PDF files up to 10 MB. Files are validated server-side and kept private. This check does not replace professional malware screening before external publication.</p><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={e=>{const file=e.target.files?.[0];if(file)uploadAsset(file);e.currentTarget.value="";}}/><div className="cloud-assets-list">{assets.map(a=><button key={a.id} onClick={()=>openAsset(a)}><CloudArrowUpIcon width={17}/>{a.file_name}<span>{Math.round(a.byte_size/1024)} KB</span></button>)}</div>{uploading&&<small>Uploading…</small>}</section>}
              <aside className="cloud-checklist-dock" aria-label="Editorial completeness">
                <section id="cloud-checklist-details" className="cloud-checklist-details" role="region" aria-label="Editorial checks" hidden={!checklistOpen}>
                  <div className="cloud-checklist-details-header"><span className="cloud-tag">EDITORIAL COMPLETENESS</span><strong>{checksDone} of {checks.length} checks passed</strong></div>
