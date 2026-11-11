@@ -279,7 +279,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
      const delivery=await sendInvitationEmail(String(invitationId));
      await loadPendingInvitations(orgId);
      setNotice(delivery.ok
-       ?"Invitation saved. Supabase accepted an authentication email request. A clickable link requires {{ .ConfirmationURL }} in the matching Supabase Auth template."
+       ?"Invitation saved. Supabase accepted an authentication email request. A clickable link requires the ConfirmationURL variable in the matching Supabase Auth template."
        :delivery.reason||"Invitation saved, but an email was not sent.");
      setInviteEmail("");
    }catch(e){setError(short(e));}
@@ -620,7 +620,7 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                      </div>
                    </div>;
                  })}
-               <p className="cloud-pending-footnote">Supabase Auth uses your existing Zoho SMTP. For existing users, the Magic link or OTP template must contain {{ .ConfirmationURL }}. New users receive the Invite user template. Recipients must sign in and explicitly accept membership.</p>
+               <p className="cloud-pending-footnote">Supabase Auth uses your existing Zoho SMTP. For existing users, the Magic link or OTP template must contain the ConfirmationURL variable. New users receive the Invite user template. Recipients must sign in and explicitly accept membership.</p>
              </section>}
              {canInvite&&<section className="cloud-panel studio-access-audit"><h2>Access audit</h2>
                <p>Role changes, removals and invitation revocations are recorded. Only owners and admins may view this log.</p>
