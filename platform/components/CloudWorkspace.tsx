@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { createClient } from "@/lib/supabase/browser";
 import { wordCount } from "@/lib/release";
+import { ReleaseBodyEditor, renderReleaseBody } from "@/components/ReleaseBodyEditor";
 
 type Role = "owner" | "admin" | "editor" | "viewer";
 type Org = { id:string; name:string; role:Role };
@@ -24,7 +25,7 @@ type PendingInvitation = {
 type Membership = {user_id:string;role:Role;created_at:string};
 type ReleaseForm = {
  headline:string; summary:string; issuer:string; dateline:string;
- category:string; body:string; quote_text:string; quote_attribution:string;
+ category:string; body:string; body_format:"plain"|"markdown"; quote_text:string; quote_attribution:string;
  boilerplate:string; contact_name:string; contact_email:string;
 };
 type Release = ReleaseForm & {
@@ -32,8 +33,10 @@ type Release = ReleaseForm & {
  version:number; status:string; updated_at:string; created_at:string; archived_at:string|null;
 };
 type Asset = {id:string;object_path:string;file_name:string;mime_type:string;byte_size:number};
+type ReleaseRevision = {version:number;created_at:string;actor_id:string|null;snapshot:Release};
+type SaveStatus = "idle"|"dirty"|"saving"|"saved"|"conflict"|"error";
 type Tab = "home"|"releases"|"editor"|"team"|"settings";
-const blank:ReleaseForm={headline:"",summary:"",issuer:"",dateline:"",category:"Company news",body:"",quote_text:"",quote_attribution:"",boilerplate:"",contact_name:"",contact_email:""};
+const blank:ReleaseForm={headline:"",summary:"",issuer:"",dateline:"",category:"Company news",body:"",body_format:"markdown",quote_text:"",quote_attribution:"",boilerplate:"",contact_name:"",contact_email:""};
 const categories=["Company news","Product launch","Partnership","Milestone","Event","Other"];
 function fmtDate(raw:string){return new Date(raw).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric"});}
 function short(error:unknown){return error instanceof Error?error.message:"Request failed. Try again.";}
@@ -67,6 +70,14 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
  const [uploading,setUploading]=useState(false);
  const [mobileOpen,setMobileOpen]=useState(false);
  const [checklistOpen,setChecklistOpen]=useState(false);
+ const [saveStatus,setSaveStatus]=useState<SaveStatus>("idle");
+ const [lastSavedAt,setLastSavedAt]=useState<string|null>(null);
+ const [changeCount,setChangeCount]=useState(0);
+ const editSerialRef=useRef(0);
+ const editorSessionRef=useRef(0);
+ const savingRef=useRef(false);
+ const [history,setHistory]=useState<ReleaseRevision[]>([]);
+ const [selectedRevision,setSelectedRevision]=useState<number|null>(null);
 
  const org=orgs.find(x=>x.id===orgId);
  const canWrite=org?.role==="owner"||org?.role==="admin"||org?.role==="editor";
@@ -123,6 +134,13 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    if(e)throw e;
    setPendingInvitations((data||[]) as PendingInvitation[]);
  },[supabase]);
+ const loadHistory=useCallback(async(id:string)=>{
+   const {data,error:e}=await supabase.from("press_release_versions")
+     .select("version,created_at,actor_id,snapshot").eq("release_id",id)
+     .order("version",{ascending:false}).limit(30);
+   if(e)throw e;
+   setHistory((data||[]) as ReleaseRevision[]);
+ },[supabase]);
  const loadAssets=useCallback(async(id:string)=>{
    const {data,error:e}=await supabase.from("press_release_media").select("id,object_path,file_name,mime_type,byte_size").eq("release_id",id).order("created_at",{ascending:false});
    if(e)throw e;
@@ -144,19 +162,47 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    loadPendingInvitations(orgId).catch(e=>setError("Could not load pending invitations: "+short(e)));
  },[orgId,loadReleases,loadMembers,loadPendingInvitations]);
  useEffect(()=>{
-   if(editingId)loadAssets(editingId).catch(e=>setError("Could not load attachments: "+short(e)));
-   else setAssets([]);
- },[editingId,loadAssets]);
+   if(editingId){
+     loadAssets(editingId).catch(e=>setError("Could not load attachments: "+short(e)));
+     loadHistory(editingId).catch(e=>setError("Could not load revision history: "+short(e)));
+   }else{setAssets([]);setHistory([]);}
+ },[editingId,loadAssets,loadHistory]);
+ useEffect(()=>{
+   if(saveStatus!=="dirty"||tab!=="editor"||!canWrite||busy)return;
+   if(!form.headline.trim()&&!form.body.trim())return;
+   const timer=window.setTimeout(()=>{void saveRelease(undefined,true);},2700);
+   return ()=>window.clearTimeout(timer);
+ // Only user changes and save state schedule writes. The optimistic version
+ // check in saveRelease protects against concurrent browser sessions.
+ },[changeCount,saveStatus,tab,canWrite,busy,editingVersion,editingId]);
 
- function switchTab(next:Tab){setTab(next);setNotice("");setError("");setMobileOpen(false);window.scrollTo({top:0,behavior:"smooth"});}
- function newRelease(){setForm({...blank});setEditingId(null);setEditingVersion(0);switchTab("editor");}
+ function switchTab(next:Tab){
+   if(tab==="editor"&&next!=="editor"&&saveStatus==="dirty"&&!window.confirm("This draft has unsaved edits. Leave without saving?"))return;
+   setTab(next);setNotice("");setError("");setMobileOpen(false);window.scrollTo({top:0,behavior:"smooth"});
+ }
+ function newRelease(){
+   if(saveStatus==="dirty"&&!window.confirm("Discard unsaved edits and create a new draft?"))return;
+   editorSessionRef.current++;
+   setForm({...blank});setEditingId(null);setEditingVersion(0);setSaveStatus("idle");setLastSavedAt(null);setSelectedRevision(null);
+   switchTab("editor");
+ }
  function editRelease(release:Release){
+   if(saveStatus==="dirty"&&!window.confirm("Discard unsaved edits and open this release?"))return;
+   editorSessionRef.current++;
    const fields=Object.keys(blank) as (keyof ReleaseForm)[];
    const value={...blank};
-   for(const key of fields)value[key]=release[key];
-   setForm(value);setEditingId(release.id);setEditingVersion(release.version);switchTab("editor");
+   for(const key of fields)value[key]=release[key]??blank[key];
+   setForm(value);setEditingId(release.id);setEditingVersion(release.version);
+   setSaveStatus("saved");setLastSavedAt(release.updated_at);setSelectedRevision(null);
+   switchTab("editor");
  }
- function field<K extends keyof ReleaseForm>(key:K,value:ReleaseForm[K]){setForm(old=>({...old,[key]:value}));setNotice("");}
+ function field<K extends keyof ReleaseForm>(key:K,value:ReleaseForm[K]){
+   editSerialRef.current++;
+   setChangeCount(editSerialRef.current);
+   setSaveStatus("dirty");
+   setForm(old=>({...old,[key]:value}));
+   setNotice("");
+ }
  async function createOrg(e:React.FormEvent){
    e.preventDefault();setBusy(true);setError("");setNotice("");
    try{
@@ -236,30 +282,76 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    }catch(e){setError(short(e));}
    finally{setBusy(false);}
  }
- async function saveRelease(e?:React.FormEvent){
-   e?.preventDefault();if(!orgId||!canWrite)return;
-   setBusy(true);setError("");setNotice("");
+ async function saveRelease(e?:React.FormEvent,automatic=false){
+   e?.preventDefault();
+   if(!orgId||!canWrite||savingRef.current)return;
+   if(automatic&&(!form.headline.trim()&&!form.body.trim()))return;
+   savingRef.current=true;
+   const pendingSequence=editSerialRef.current;
+   const session=editorSessionRef.current;
+   const snapshot={...form};
+   const savedId=editingId;
+   const savedVersion=editingVersion;
+   if(!automatic)setBusy(true);
+   setSaveStatus("saving");setError("");if(!automatic)setNotice("");
    try{
      let saved:Release;
-     if(editingId){
-       const {data,error:e}=await supabase.from("press_releases").update({...form,version:editingVersion+1})
-         .eq("id",editingId).eq("organization_id",orgId).eq("version",editingVersion)
+     if(savedId){
+       const {data,error:e}=await supabase.from("press_releases")
+         .update({...snapshot,version:savedVersion+1})
+         .eq("id",savedId).eq("organization_id",orgId).eq("version",savedVersion)
          .eq("status","draft").select("*").maybeSingle();
        if(e)throw e;
-       if(!data)throw new Error("This release changed in another session. Reopen it to review the latest version before saving.");
+       if(!data)throw new Error("VERSION_CONFLICT: Another session saved a newer revision. Copy your edits, then reopen the release before saving.");
        saved=data as Release;
      }else{
        const {data,error:e}=await supabase.from("press_releases").insert({
-         ...form,organization_id:orgId,created_by:userId,status:"draft",version:1
+         ...snapshot,organization_id:orgId,created_by:userId,status:"draft",version:1
        }).select("*").single();
        if(e)throw e;
        saved=data as Release;
      }
-     setEditingId(saved.id);setEditingVersion(saved.version);
-     setNotice("Saved securely to your organization's workspace. Revision "+saved.version+" recorded.");
+     if(editorSessionRef.current===session){
+       setEditingId(saved.id);setEditingVersion(saved.version);setLastSavedAt(saved.updated_at);
+       setSaveStatus(editSerialRef.current===pendingSequence?"saved":"dirty");
+       if(!automatic)setNotice("Draft saved privately. Revision "+saved.version+" recorded.");
+       await loadHistory(saved.id);
+     }
      await loadReleases(orgId);
+   }catch(err){
+     if(editorSessionRef.current===session){
+       const message=short(err);
+       setSaveStatus(message.includes("VERSION_CONFLICT")||message.includes("version_conflict")?"conflict":"error");
+       setError(message.replace("VERSION_CONFLICT: ",""));
+     }
+   }finally{
+     savingRef.current=false;
+     if(!automatic)setBusy(false);
+   }
+ }
+ async function restoreRevision(revision:ReleaseRevision){
+   if(!orgId||!editingId||!canWrite||savingRef.current||busy)return;
+   if(saveStatus==="dirty"||saveStatus==="saving"){
+     setError("Save or discard your current edits before restoring a revision.");return;
+   }
+   if(!window.confirm("Restore revision "+revision.version+" as a NEW draft revision? Existing history will remain unchanged."))return;
+   setBusy(true);setError("");setNotice("");savingRef.current=true;
+   try{
+     const fields=Object.keys(blank) as (keyof ReleaseForm)[];
+     const snapshot={...blank};
+     for(const key of fields)snapshot[key]=revision.snapshot[key]??blank[key];
+     const {data,error:e}=await supabase.from("press_releases")
+       .update({...snapshot,version:editingVersion+1})
+       .eq("id",editingId).eq("organization_id",orgId).eq("status","draft")
+       .eq("version",editingVersion).select("*").maybeSingle();
+     if(e)throw e;
+     if(!data)throw new Error("Restore conflict: a newer revision exists. Refresh before restoring.");
+     setForm(snapshot);setEditingVersion(data.version);setLastSavedAt(data.updated_at);
+     setSaveStatus("saved");setSelectedRevision(null);
+     setNotice("Revision "+revision.version+" restored as new revision "+data.version+". Earlier versions remain immutable.");
+     await Promise.all([loadReleases(orgId),loadHistory(editingId)]);
    }catch(e){setError(short(e));}
-   finally{setBusy(false);}
+   finally{savingRef.current=false;setBusy(false);}
  }
  async function archiveRelease(release:Release){
    if(!canWrite||!window.confirm("Archive this draft? It will be hidden from the active list."))return;
@@ -303,7 +395,10 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    if(e){setError(e.message);setBusy(false);return;}
    router.replace("/login");router.refresh();
  }
- const orgSwitcher=<select aria-label="Selected organization" value={orgId} onChange={e=>{setOrgId(e.target.value);switchTab("home");}}>
+ const orgSwitcher=<select aria-label="Selected organization" value={orgId} onChange={e=>{
+   if(tab==="editor"&&saveStatus==="dirty"&&!window.confirm("Unsaved edits will be lost when switching organizations. Continue?"))return;
+   editorSessionRef.current++;setOrgId(e.target.value);setSaveStatus("idle");setEditingId(null);switchTab("home");
+ }}>
    {orgs.map(o=><option value={o.id} key={o.id}>{o.name}</option>)}
  </select>;
  return <div className="cloud-app">
@@ -342,17 +437,22 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
              <section className="cloud-panel cloud-list"><div className="cloud-panel-head"><h2>{releases.length} active draft{releases.length===1?"":"s"}</h2><span>Organization: {org?.name}</span></div>
                {!releases.length?<div className="cloud-empty"><DocumentTextIcon width={28}/><p>No releases yet.</p></div>:releases.map(r=><div className="cloud-release-item" key={r.id}><DocumentTextIcon width={22}/><div><strong>{r.headline||"Untitled draft"}</strong><small>{r.category} · Version {r.version} · {fmtDate(r.updated_at)}</small></div><button onClick={()=>editRelease(r)}>Open</button>{canWrite&&<button className="cloud-archive" onClick={()=>archiveRelease(r)} disabled={busy}>Archive</button>}</div>)}
              </section></>}
-           {tab==="editor"&&<><div className="cloud-heading cloud-editor-heading"><div><button className="cloud-back" onClick={()=>switchTab("releases")}><ArrowLeftIcon width={16}/> Back to releases</button><span className="cloud-tag">RELEASE EDITOR</span><h1>{editingId?"Edit press release":"Create a press release"}</h1><p>Every save creates an immutable revision in your organization&apos;s workspace.</p></div>{canWrite&&<button className="cloud-button" onClick={()=>saveRelease()} disabled={busy}>{busy?"Saving…":"Save release"} <ArrowRightIcon width={17}/></button>}</div>
+           {tab==="editor"&&<><div className="cloud-heading cloud-editor-heading"><div><button className="cloud-back" onClick={()=>switchTab("releases")}><ArrowLeftIcon width={16}/> Back to releases</button><span className="cloud-tag">RELEASE EDITOR</span><h1>{editingId?"Edit press release":"Create a press release"}</h1><p>Autosave keeps your draft private. Every successful save preserves an immutable revision.</p><div className="studio-save-indicator" role="status" aria-live="polite">{saveStatus==="saving"?"Saving…":saveStatus==="dirty"?"Unsaved edits — autosave pending":saveStatus==="saved"?"All changes saved":saveStatus==="conflict"?"Conflict — reopen before saving":saveStatus==="error"?"Save failed — retry":"New unsaved draft"}{lastSavedAt&&<small> · {new Date(lastSavedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</small>}</div></div>{canWrite&&<button className="cloud-button" onClick={()=>saveRelease()} disabled={busy||saveStatus==="saving"}>{busy||saveStatus==="saving"?"Saving…":"Save now"} <ArrowRightIcon width={17}/></button>}</div>
              {!canWrite?<div className="cloud-panel cloud-empty"><LockClosedIcon width={27}/><p>This organization role is read-only.</p></div>:<div className="cloud-editor-layout"><form className="cloud-panel cloud-editor cloud-editor-wide" onSubmit={saveRelease}>
                <h2>Announcement details</h2><Field title="Headline" required hint={form.headline.length+"/140 characters"}><input maxLength={140} value={form.headline} onChange={e=>field("headline",e.target.value)} placeholder="Company announces a verified new milestone"/></Field>
                <Field title="Summary" required hint={form.summary.length+"/320 characters"}><textarea maxLength={320} rows={3} value={form.summary} onChange={e=>field("summary",e.target.value)} placeholder="Summarize what happened and who it affects."/></Field>
                <div className="cloud-fields-two"><Field title="Organization / issuer"><input value={form.issuer} maxLength={160} onChange={e=>field("issuer",e.target.value)} placeholder="Company name"/></Field><Field title="Announcement type"><select value={form.category} onChange={e=>field("category",e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></Field></div>
                <Field title="Dateline"><input value={form.dateline} maxLength={180} onChange={e=>field("dateline",e.target.value)} placeholder="CITY, State — Month Day, Year"/></Field>
-               <h2>Release body</h2><Field title="Press release body" required hint={wordCount(form.body)+" words (60 recommended for draft readiness)"}><textarea rows={12} maxLength={100000} value={form.body} onChange={e=>field("body",e.target.value)} placeholder="Lead with the announcement, add evidence and supporting context..."/></Field>
+               <h2>Release body</h2><Field title="Press release body" required hint={wordCount(form.body)+" words (60 recommended for draft readiness)"}>
+                <ReleaseBodyEditor value={form.body} format={form.body_format} onChange={(body,bodyFormat)=>{
+                  editSerialRef.current++;setChangeCount(editSerialRef.current);setSaveStatus("dirty");
+                  setForm(old=>({...old,body,body_format:bodyFormat}));setNotice("");
+                }}/>
+               </Field>
                <div className="cloud-fields-two"><Field title="Approved quote (optional)"><textarea rows={3} maxLength={5000} value={form.quote_text} onChange={e=>field("quote_text",e.target.value)}/></Field><Field title="Quote attribution"><input maxLength={500} value={form.quote_attribution} onChange={e=>field("quote_attribution",e.target.value)} placeholder="Name and title"/></Field></div>
                <Field title="Company boilerplate"><textarea rows={3} maxLength={10000} value={form.boilerplate} onChange={e=>field("boilerplate",e.target.value)}/></Field>
                <h2>Media contact</h2><div className="cloud-fields-two"><Field title="Contact name"><input value={form.contact_name} maxLength={160} onChange={e=>field("contact_name",e.target.value)}/></Field><Field title="Contact email"><input type="email" value={form.contact_email} maxLength={254} onChange={e=>field("contact_email",e.target.value)}/></Field></div>
-               <button className="cloud-button" type="submit" disabled={busy}>{busy?"Saving…":editingId?"Save new revision":"Create draft"} <ArrowRightIcon width={17}/></button>
+               <button className="cloud-button" type="submit" disabled={busy||saveStatus==="saving"}>{busy||saveStatus==="saving"?"Saving…":editingId?"Save now":"Create draft"} <ArrowRightIcon width={17}/></button>
              </form>
              <section className="cloud-panel cloud-release-preview cloud-release-preview-wide" aria-label="Live draft preview">
                <div className="cloud-preview-heading">
@@ -363,13 +463,31 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
                  <h2>{form.headline||"Your headline appears here"}</h2>
                  <p className="cloud-summary">{form.summary||"A concise summary introduces the announcement."}</p>
                  <div className="cloud-preview-dateline">{form.dateline||"CITY — DATE"}</div>
-                 {form.body.trim()?form.body.trim().split(/\n\s*\n/).filter(Boolean).map((p,i)=><p key={i}>{p}</p>):<p>Start writing the announcement to preview it here.</p>}
+                 {form.body.trim()?renderReleaseBody(form.body,form.body_format):<p>Start writing the announcement to preview it here.</p>}
                  {form.quote_text&&<blockquote>“{form.quote_text}”{form.quote_attribution&&<cite> — {form.quote_attribution}</cite>}</blockquote>}
                  {form.boilerplate&&<div className="cloud-preview-section"><h3>About {form.issuer||"the organization"}</h3><p>{form.boilerplate}</p></div>}
                  {(form.contact_name||form.contact_email)&&<div className="cloud-preview-section"><h3>Media contact</h3><p>{form.contact_name}{form.contact_name&&form.contact_email&&<br/>}{form.contact_email}</p></div>}
                </article>
                <div className="cloud-preview-footer">Private workspace preview · No publishing action is performed here.</div>
              </section>
+             {editingId&&<section className="cloud-panel studio-revisions cloud-assets-wide" aria-label="Release revision history">
+               <div className="studio-revisions-header"><div><span className="cloud-tag">VERSION HISTORY</span><h2>Draft revisions</h2><p>Up to 30 latest immutable snapshots. Restoring always creates a new revision.</p></div><span>Current · v{editingVersion}</span></div>
+               <div className="studio-revisions-list">{history.map(rev=><div className="studio-revision-row" key={rev.version}>
+                 <div><strong>Revision {rev.version}</strong><small>{fmtDate(rev.created_at)} · {rev.actor_id===userId?"You":"Team member"}</small></div>
+                 <div><button type="button" className="cloud-button secondary" onClick={()=>setSelectedRevision(old=>old===rev.version?null:rev.version)}>{selectedRevision===rev.version?"Hide comparison":"Compare"}</button>
+                   {rev.version!==editingVersion&&<button type="button" className="cloud-button secondary" disabled={busy||saveStatus==="saving"} onClick={()=>restoreRevision(rev)}>Restore</button>}</div>
+               </div>)}</div>
+               {selectedRevision!==null&&(()=>{
+                 const old=history.find(x=>x.version===selectedRevision);
+                 if(!old)return null;
+                 return <div className="studio-revision-compare"><h3>Compare revision {selectedRevision} with current draft</h3>
+                   <div className="studio-compare-columns">
+                     <div><strong>Revision {selectedRevision}</strong><h4>{old.snapshot.headline}</h4><pre>{old.snapshot.body}</pre></div>
+                     <div><strong>Current editor</strong><h4>{form.headline}</h4><pre>{form.body}</pre></div>
+                   </div>
+                 </div>;
+               })()}
+             </section>}
              {editingId&&<section className="cloud-panel cloud-assets cloud-assets-wide"><span className="cloud-tag">PRIVATE MEDIA STORAGE</span><h2>Supporting files</h2><p>Upload one PDF or image at a time, up to 10 MB. Files are private to authorized organization members.</p><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploading} onChange={e=>{const file=e.target.files?.[0];if(file)uploadAsset(file);e.currentTarget.value="";}}/><div className="cloud-assets-list">{assets.map(a=><button key={a.id} onClick={()=>openAsset(a)}><CloudArrowUpIcon width={17}/>{a.file_name}<span>{Math.round(a.byte_size/1024)} KB</span></button>)}</div>{uploading&&<small>Uploading…</small>}</section>}
              <aside className="cloud-checklist-dock" aria-label="Editorial completeness">
                <section id="cloud-checklist-details" className="cloud-checklist-details" role="region" aria-label="Editorial checks" hidden={!checklistOpen}>
