@@ -191,7 +191,10 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    editorSessionRef.current++;
    const fields=Object.keys(blank) as (keyof ReleaseForm)[];
    const value={...blank};
-   for(const key of fields)value[key]=release[key]??blank[key];
+   for(const key of fields){
+     if(key==="body_format")value.body_format=release.body_format==="markdown"?"markdown":"plain";
+     else value[key]=release[key]??blank[key];
+   }
    setForm(value);setEditingId(release.id);setEditingVersion(release.version);
    setSaveStatus("saved");setLastSavedAt(release.updated_at);setSelectedRevision(null);
    switchTab("editor");
@@ -339,7 +342,10 @@ export function CloudWorkspace({userId,userEmail,initialOrgId="",initialTab="hom
    try{
      const fields=Object.keys(blank) as (keyof ReleaseForm)[];
      const snapshot={...blank};
-     for(const key of fields)snapshot[key]=revision.snapshot[key]??blank[key];
+     for(const key of fields){
+       if(key==="body_format")snapshot.body_format=revision.snapshot.body_format==="markdown"?"markdown":"plain";
+       else snapshot[key]=revision.snapshot[key]??blank[key];
+     }
      const {data,error:e}=await supabase.from("press_releases")
        .update({...snapshot,version:editingVersion+1})
        .eq("id",editingId).eq("organization_id",orgId).eq("status","draft")
